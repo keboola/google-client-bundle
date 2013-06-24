@@ -1,5 +1,5 @@
 {
-	"name": "keboola/google/client-bundle",
+	"name": "keboola/google-client-bundle",
 	"type": "symfony-bundle",
 	"description": "Keboola Google API Client",
 	"keywords": [],
