@@ -1,0 +1,11 @@
+*.log
+.idea
+cache.properties
+composer.lock
+composer.phar
+tmp
+vendor/*
+
+# osx noise
+.DS_Store
+profile

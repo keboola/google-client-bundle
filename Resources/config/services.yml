@@ -1,0 +1,6 @@
+parameters:
+
+services:
+    google_rest_api:
+        class: Keboola\Google\ClientBundle\Google\RestApi
+        arguments: [%google.client-id%,%google.client-secret%]

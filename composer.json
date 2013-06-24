@@ -1,0 +1,37 @@
+{
+	"name": "keboola/google/client-bundle",
+	"type": "symfony-bundle",
+	"description": "Keboola Google API Client",
+	"keywords": [],
+	"authors": [
+		{
+			"name": "Miroslav Čillík",
+			"email": "miro@keboola.com"
+		}
+	],
+	"require": {
+		"php": ">=5.3.5"
+	},
+	"require-dev": {
+		"syrup/component-bundle": "1.1.*",
+		"syrup/development-bundle": ">=1.0.8"
+	},
+	"scripts": {
+		"post-install-cmd": [
+			"Sensio\\Bundle\\DistributionBundle\\Composer\\ScriptHandler::buildBootstrap"
+		],
+		"post-update-cmd": [
+			"Sensio\\Bundle\\DistributionBundle\\Composer\\ScriptHandler::buildBootstrap",
+			"Sensio\\Bundle\\DistributionBundle\\Composer\\ScriptHandler::clearCache"
+		]
+	},
+	"minimum-stability": "alpha",
+	"autoload": {
+		"psr-0": { "Keboola\\Google\\ClientBundle": "" }
+	},
+	"target-dir": "Keboola/Google/ClientBundle",
+	"extra": {
+		"symfony-app-dir": "vendor/syrup/development-bundle/app",
+		"symfony-web-dir": "vendor/syrup/development-bundle/web"
+	}
+}
