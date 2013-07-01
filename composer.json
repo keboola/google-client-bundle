@@ -9,29 +9,41 @@
 			"email": "miro@keboola.com"
 		}
 	],
+	"repositories": [
+		{
+			"type": "vcs",
+			"url": "git@bitbucket.org:keboola/syrup-development-bundle.git"
+		}
+	],
 	"require": {
 		"php": ">=5.3.5"
 	},
 	"require-dev": {
-		"syrup/component-bundle": "1.1.*",
-		"syrup/development-bundle": ">=1.0.8"
+		"syrup/component-bundle": "1.2.*",
+		"syrup/development-bundle": "1.1.*"
 	},
 	"scripts": {
 		"post-install-cmd": [
+			"Incenteev\\ParameterHandler\\ScriptHandler::buildParameters",
 			"Sensio\\Bundle\\DistributionBundle\\Composer\\ScriptHandler::buildBootstrap"
 		],
 		"post-update-cmd": [
+			"Incenteev\\ParameterHandler\\ScriptHandler::buildParameters",
 			"Sensio\\Bundle\\DistributionBundle\\Composer\\ScriptHandler::buildBootstrap",
 			"Sensio\\Bundle\\DistributionBundle\\Composer\\ScriptHandler::clearCache"
 		]
 	},
-	"minimum-stability": "alpha",
+	"minimum-stability": "stable",
 	"autoload": {
 		"psr-0": { "Keboola\\Google\\ClientBundle": "" }
 	},
 	"target-dir": "Keboola/Google/ClientBundle",
 	"extra": {
 		"symfony-app-dir": "vendor/syrup/development-bundle/app",
-		"symfony-web-dir": "vendor/syrup/development-bundle/web"
+		"symfony-web-dir": "vendor/syrup/development-bundle/web",
+		"incenteev-parameters": {
+			"keep-outdated": true,
+			"file": "vendor/syrup/development-bundle/app/config/parameters.yml"
+		}
 	}
 }

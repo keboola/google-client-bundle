@@ -69,7 +69,7 @@ class RestApi {
 	 * @param string $state
 	 * @return string
 	 */
-	public function getAuthorizationUrl($redirectUri, $scope, $approvalPrompt = 'auto', $accessType = 'offline', $state = '')
+	public function getAuthorizationUrl($redirectUri, $scope, $approvalPrompt = 'force', $accessType = 'offline', $state = '')
 	{
 		$params = array(
 			'response_type=code',
@@ -184,9 +184,29 @@ class RestApi {
 	 * @param Array $addHeaders
 	 * @param Array $params
 	 * @throws RestApiException
-	 * @return Array $body
+	 * @return Response $response
 	 */
 	public function call($url, $method = 'GET', $addHeaders = array(), $params = array())
+	{
+		/** @var Response $response */
+		$response = $this->request($url, $method, $addHeaders, $params)->send();
+
+		if ($response->getStatusCode() != 200) {
+			throw new RestApiException($response->getStatusCode(), $response->getMessage());
+		}
+
+		return $response;
+	}
+
+	/**
+	 * @param $url
+	 * @param string $method
+	 * @param array $addHeaders
+	 * @param array $params
+	 * @return Request
+	 * @throws \Keboola\Google\ClientBundle\Exception\RestApiException
+	 */
+	public function request($url, $method = 'GET', $addHeaders = array(), $params = array())
 	{
 		if (null == $this->accessToken) {
 			throw new RestApiException(400, "Access Token must be set");
@@ -198,7 +218,9 @@ class RestApi {
 		);
 
 		if (null != $addHeaders && is_array($addHeaders)) {
-			$headers = array_merge($headers, $addHeaders);
+			foreach($addHeaders as $k => $v) {
+				$headers[$k] = $v;
+			}
 		}
 
 		$client = new HttpClient();
@@ -221,13 +243,8 @@ class RestApi {
 				$request = $client->post($url, $headers, $params);
 				break;
 		}
-		$response = $request->send();
 
-		if ($response->getStatusCode() != 200) {
-			throw new RestApiException($response->getStatusCode(), $response->getMessage());
-		}
-
-		return $response->json();
+		return $request;
 	}
 }
 
