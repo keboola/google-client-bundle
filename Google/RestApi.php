@@ -59,6 +59,12 @@ class RestApi {
 		$this->refreshTokenCallback = $callback;
 	}
 
+	public function setAppCredentials($clientId, $clientSecret)
+	{
+		$this->clientId = $clientId;
+		$this->clientSecret = $clientSecret;
+	}
+
 	/**
 	 * Obtains authorization code by user login into Google and approve app
 	 *
