@@ -71,8 +71,10 @@ class Client extends Component
 		$restApi = $this->_container->get('google_rest_api');
 		$restApi->setCredentials($params['access_token'], $params['refresh_token']);
 
-		$body = $restApi->call(self::USER_INFO_URL, 'GET');
+		$response = $restApi->call(self::USER_INFO_URL, 'GET');
 
-		return $body;
+		return array(
+			'user-info' => $response->json()
+		);
 	}
 }
