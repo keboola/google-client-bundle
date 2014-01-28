@@ -215,7 +215,7 @@ class RestApi {
 	public function request($url, $method = 'GET', $addHeaders = array(), $params = array())
 	{
 		if (null == $this->accessToken) {
-			throw new RestApiException(400, "Access Token must be set");
+			throw new RestApiException("Access Token must be set", 400);
 		}
 
 		$headers = array(
