@@ -243,7 +243,7 @@ class RestApi {
 		/** @var Request $request */
 		switch (strtolower($method)) {
 			case 'get':
-				$request = $client->get($url, $headers);
+				$request = $client->get($url, $headers, $params);
 				break;
 			case 'post':
 				$request = $client->post($url, $headers, $params);
