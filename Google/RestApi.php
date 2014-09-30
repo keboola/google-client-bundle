@@ -231,7 +231,7 @@ class RestApi {
 
 		$client = new HttpClient();
 		$client->addSubscriber(new BackoffPlugin(new TruncatedBackoffStrategy(3,
-			new HttpBackoffStrategy(null,
+			new HttpBackoffStrategy(array(403,500,502,503,504),
 				new CurlBackoffStrategy(null,
 					new CallbackBackoffStrategy($this->getBackoffCallback(), true,
 						new ExponentialBackoffStrategy()
