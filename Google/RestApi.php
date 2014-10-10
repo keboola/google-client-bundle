@@ -106,6 +106,14 @@ class RestApi {
 	public function authorize($code, $redirectUri)
 	{
 		$client = new HttpClient();
+		$client->addSubscriber(new BackoffPlugin(new TruncatedBackoffStrategy(3,
+			new HttpBackoffStrategy(array(500,502,503,504),
+				new CurlBackoffStrategy(null,
+					new ExponentialBackoffStrategy()
+				)
+			)
+		)));
+		
 		$request = $client->post(self::OAUTH_TOKEN_URL, array(
 			'Content-Type'	=> 'application/x-www-form-urlencoded',
 			'Content-Transfer-Encoding' => 'binary'
@@ -134,6 +142,14 @@ class RestApi {
 	public function refreshToken()
 	{
 		$client = new HttpClient();
+		$client->addSubscriber(new BackoffPlugin(new TruncatedBackoffStrategy(3,
+			new HttpBackoffStrategy(array(500,502,503,504),
+				new CurlBackoffStrategy(null,
+					new ExponentialBackoffStrategy()
+				)
+			)
+		)));
+
 		$request = $client->post(self::OAUTH_TOKEN_URL, array(
 			'Content-Type'	=> 'application/x-www-form-urlencoded',
 			'Content-Transfer-Encoding' => 'binary'
