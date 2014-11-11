@@ -10,7 +10,6 @@ namespace Keboola\Google\ClientBundle\Google;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Event\AbstractTransferEvent;
-use GuzzleHttp\Message\Request;
 use GuzzleHttp\Message\Response;
 
 use GuzzleHttp\Subscriber\Retry\RetrySubscriber;
@@ -241,8 +240,8 @@ class RestApi {
 	 * @param string $method
 	 * @param array $addHeaders
 	 * @param array $params
-	 * @return Request
-	 * @throws \Keboola\Google\ClientBundle\Exception\RestApiException
+	 * @return Response
+	 * @throws RestApiException
 	 */
 	public function request($url, $method = 'GET', $addHeaders = array(), $params = array())
 	{
@@ -264,23 +263,20 @@ class RestApi {
 		$client = $this->getClient();
 		$client->getEmitter()->attach($this->createExponentialBackoffSubscriber());
 
-		/** @var Request $request */
 		switch (strtolower($method)) {
 			case 'get':
-				$request = $client->get($url, [
+				return $client->get($url, [
 					'headers' => $headers,
 					'query' => $params
 				]);
-				break;
 			case 'post':
-				$request = $client->post($url, [
+				return $client->post($url, [
 					'headers' => $headers,
 					'body' => $params
 				]);
-				break;
 		}
 
-		return $request;
+		throw new RestApiException("Wrong http method specified", 500);
 	}
 }
 
