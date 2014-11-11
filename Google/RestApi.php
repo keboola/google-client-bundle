@@ -269,7 +269,7 @@ class RestApi {
 			case 'get':
 				$request = $client->get($url, [
 					'headers' => $headers,
-					'body' => $params
+					'query' => $params
 				]);
 				break;
 			case 'post':

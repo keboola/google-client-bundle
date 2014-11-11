@@ -12,7 +12,7 @@
 	"require": {
 		"php": ">=5.4.0",
 		"guzzlehttp/guzzle": "~4.0",
-		"guzzlehttp/retry-subscriber": "~1.0"
+		"guzzlehttp/retry-subscriber": "~0.1.1"
 	},
 	"minimum-stability": "stable",
 	"autoload": {
