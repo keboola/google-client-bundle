@@ -24,6 +24,8 @@ class RestApi {
 	const OAUTH_TOKEN_URL = 'https://accounts.google.com/o/oauth2/token';
 	const USER_INFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
 
+	protected $nBackoffs = 5;
+
 	protected $accessToken;
 	protected $refreshToken;
 	protected $clientId;
@@ -36,6 +38,11 @@ class RestApi {
 		$this->clientId = $clientId;
 		$this->clientSecret = $clientSecret;
 		$this->setCredentials($accessToken, $refreshToken);
+	}
+
+	public function setBackoffsCount($cnt)
+	{
+		$this->nBackoffs = $cnt;
 	}
 
 	public function setCredentials($accessToken, $refreshToken)
@@ -106,14 +113,14 @@ class RestApi {
 	public function authorize($code, $redirectUri)
 	{
 		$client = new HttpClient();
-		$client->addSubscriber(new BackoffPlugin(new TruncatedBackoffStrategy(3,
+		$client->addSubscriber(new BackoffPlugin(new TruncatedBackoffStrategy($this->nBackoffs,
 			new HttpBackoffStrategy(array(500,502,503,504),
 				new CurlBackoffStrategy(null,
 					new ExponentialBackoffStrategy()
 				)
 			)
 		)));
-		
+
 		$request = $client->post(self::OAUTH_TOKEN_URL, array(
 			'Content-Type'	=> 'application/x-www-form-urlencoded',
 			'Content-Transfer-Encoding' => 'binary'
@@ -142,7 +149,7 @@ class RestApi {
 	public function refreshToken()
 	{
 		$client = new HttpClient();
-		$client->addSubscriber(new BackoffPlugin(new TruncatedBackoffStrategy(3,
+		$client->addSubscriber(new BackoffPlugin(new TruncatedBackoffStrategy($this->nBackoffs,
 			new HttpBackoffStrategy(array(500,502,503,504),
 				new CurlBackoffStrategy(null,
 					new ExponentialBackoffStrategy()
