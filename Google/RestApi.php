@@ -8,23 +8,23 @@
 
 namespace Keboola\Google\ClientBundle\Google;
 
-use Guzzle\Http\Message\Request;
-use Guzzle\Http\Message\Response;
-use Guzzle\Plugin\Backoff\CallbackBackoffStrategy;
-use Guzzle\Plugin\Backoff\CurlBackoffStrategy;
-use Guzzle\Plugin\Backoff\ExponentialBackoffStrategy;
-use Guzzle\Plugin\Backoff\HttpBackoffStrategy;
-use Guzzle\Plugin\Backoff\TruncatedBackoffStrategy;
-use Guzzle\Service\Client as HttpClient;
-use Guzzle\Plugin\Backoff\BackoffPlugin;
+use GuzzleHttp\Client;
+use GuzzleHttp\Event\AbstractTransferEvent;
+use GuzzleHttp\Message\Request;
+use GuzzleHttp\Message\Response;
+
+use GuzzleHttp\Subscriber\Retry\RetrySubscriber;
 use Keboola\Google\ClientBundle\Exception\RestApiException;
 
 class RestApi {
-	const OAUTH_URL = 'https://accounts.google.com/o/oauth2/auth';
-	const OAUTH_TOKEN_URL = 'https://accounts.google.com/o/oauth2/token';
+	const ACCOUNTS_URL      = 'https://accounts.google.com/o/oauth2/';
+
+	const OAUTH_URL         = 'https://accounts.google.com/o/oauth2/auth';
+	const OAUTH_TOKEN_URL   = 'https://accounts.google.com/o/oauth2/token';
+
 	const USER_INFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
 
-	protected $nBackoffs = 5;
+	protected $maxBackoffs = 5;
 	protected $backoffCallback403;
 
 	protected $accessToken;
@@ -39,12 +39,34 @@ class RestApi {
 		$this->clientId = $clientId;
 		$this->clientSecret = $clientSecret;
 		$this->setCredentials($accessToken, $refreshToken);
+
 		$this->backoffCallback403 = function () {};
+	}
+
+	protected function getClient($baseUrl = '')
+	{
+		return new Client([
+			'base_url' => $baseUrl,
+		]);
+	}
+
+	protected function createExponentialBackoffSubscriber()
+	{
+		$filter = RetrySubscriber::createChainFilter([
+			RetrySubscriber::createCurlFilter(),
+			RetrySubscriber::createStatusFilter([500,502,503,504]),
+			$this->getBackoffCallback()
+		]);
+
+		return new RetrySubscriber([
+			'filter' => $filter,
+			'max' => $this->maxBackoffs,
+		]);
 	}
 
 	public function setBackoffsCount($cnt)
 	{
-		$this->nBackoffs = $cnt;
+		$this->maxBackoffs = $cnt;
 	}
 
 	public function setBackoffCallback403($function)
@@ -119,99 +141,83 @@ class RestApi {
 	 */
 	public function authorize($code, $redirectUri)
 	{
-		$client = new HttpClient();
-		$client->addSubscriber(new BackoffPlugin(new TruncatedBackoffStrategy($this->nBackoffs,
-			new HttpBackoffStrategy(array(500,502,503,504),
-				new CurlBackoffStrategy(null,
-					new ExponentialBackoffStrategy()
-				)
-			)
-		)));
+		$client = $this->getClient(self::ACCOUNTS_URL);
+		$client->getEmitter()->attach($this->createExponentialBackoffSubscriber());
 
-		$request = $client->post(self::OAUTH_TOKEN_URL, array(
-			'Content-Type'	=> 'application/x-www-form-urlencoded',
-			'Content-Transfer-Encoding' => 'binary'
-		), array(
-			'code'	        => $code,
-			'client_id'	    => $this->clientId,
-			'client_secret'	=> $this->clientSecret,
-			'redirect_uri'	=> $redirectUri,
-			'grant_type'	=> 'authorization_code'
-		));
+		$response = $client->post('token', [
+			'headers' => [
+				'Content-Type'	=> 'application/x-www-form-urlencoded',
+				'Content-Transfer-Encoding' => 'binary'
+			],
+			'body' => [
+				'code'	        => $code,
+				'client_id'	    => $this->clientId,
+				'client_secret'	=> $this->clientSecret,
+				'redirect_uri'	=> $redirectUri,
+				'grant_type'	=> 'authorization_code'
+			]
+		])->json();
 
-		$response = $request->send();
+		$this->accessToken = $response['access_token'];
+		$this->refreshToken = $response['refresh_token'];
 
-		if ($response->getStatusCode() != 200) {
-			throw new RestApiException($response->getStatusCode(), $response->getMessage());
-		}
-
-		$body = $response->json();
-
-		$this->accessToken = $body['access_token'];
-		$this->refreshToken = $body['refresh_token'];
-
-		return $body;
+		return $response;
 	}
 
 	public function refreshToken()
 	{
-		$client = new HttpClient();
-		$client->addSubscriber(new BackoffPlugin(new TruncatedBackoffStrategy($this->nBackoffs,
-			new HttpBackoffStrategy(array(500,502,503,504),
-				new CurlBackoffStrategy(null,
-					new ExponentialBackoffStrategy()
-				)
-			)
-		)));
+		$client = $this->getClient(self::ACCOUNTS_URL);
+		$client->getEmitter()->attach($this->createExponentialBackoffSubscriber());
 
-		$request = $client->post(self::OAUTH_TOKEN_URL, array(
-			'Content-Type'	=> 'application/x-www-form-urlencoded',
-			'Content-Transfer-Encoding' => 'binary'
-		), array(
-			'refresh_token'	=> $this->refreshToken,
-			'client_id'		=> $this->clientId,
-			'client_secret' => $this->clientSecret,
-			'grant_type'	=> 'refresh_token'
-		));
+		$response = $client->post('token', [
+			'headers' => [
+				'Content-Type' => 'application/x-www-form-urlencoded',
+				'Content-Transfer-Encoding' => 'binary'
+			],
+			'body' => [
+				'refresh_token'	=> $this->refreshToken,
+				'client_id'		=> $this->clientId,
+				'client_secret' => $this->clientSecret,
+				'grant_type'	=> 'refresh_token'
+			]
+		])->json();
 
-		$response = $request->send();
-
-		if ($response->getStatusCode() != 200) {
-			throw new RestApiException($response->getStatusCode(), $response->getMessage());
-		}
-
-		$body = $response->json();
-
-		$this->accessToken = $body['access_token'];
-		if (isset($body['refresh_token'])) {
-			$this->refreshToken = $body['refresh_token'];
+		$this->accessToken = $response['access_token'];
+		if (isset($response['refresh_token'])) {
+			$this->refreshToken = $response['refresh_token'];
 		}
 
 		if ($this->refreshTokenCallback != null) {
 			call_user_func($this->refreshTokenCallback, $this->accessToken, $this->refreshToken);
 		}
 
-		return $body;
+		return $response;
 	}
 
 	public function getBackoffCallback()
 	{
 		$api = $this;
-		return function($retries, Request $request, Response $response, $e) use ($api) {
+		return function ($retries, AbstractTransferEvent $event) use ($api) {
+
+			/** @var Response $response */
+			$response = $event->getResponse() ?: null;
 			if ($response) {
-				//Short circuit the rest of the checks if it was successful
-				if ($response->isSuccessful()) {
+
+				if ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
 					return false;
 				}
+
 				if ($response->getStatusCode() == 401) {
 					$tokens = $api->refreshToken();
-					$request->setHeader('Authorization', 'Bearer ' . $tokens['access_token']);
+					$event->getRequest()->setHeader('Authorization', 'Bearer ' . $tokens['access_token']);
 				}
+
 				if ($response->getStatusCode() == 403) {
 					call_user_func($this->backoffCallback403, $response);
 				}
-				return true;
 			}
+
+			return true;
 		};
 	}
 
@@ -227,14 +233,7 @@ class RestApi {
 	 */
 	public function call($url, $method = 'GET', $addHeaders = array(), $params = array())
 	{
-		/** @var Response $response */
-		$response = $this->request($url, $method, $addHeaders, $params)->send();
-
-		if ($response->getStatusCode() != 200) {
-			throw new RestApiException($response->getStatusCode(), $response->getMessage());
-		}
-
-		return $response;
+		return $this->request($url, $method, $addHeaders, $params);
 	}
 
 	/**
@@ -251,10 +250,10 @@ class RestApi {
 			throw new RestApiException("Access Token must be set", 400);
 		}
 
-		$headers = array(
-			'Accept' => 'application/json',
+		$headers = [
+			'Accept'        => 'application/json',
 			'Authorization'	=> 'Bearer ' . $this->accessToken
-		);
+		];
 
 		if (null != $addHeaders && is_array($addHeaders)) {
 			foreach($addHeaders as $k => $v) {
@@ -262,24 +261,22 @@ class RestApi {
 			}
 		}
 
-		$client = new HttpClient();
-		$client->addSubscriber(new BackoffPlugin(new TruncatedBackoffStrategy($this->nBackoffs,
-			new HttpBackoffStrategy(array(500,502,503,504),
-				new CurlBackoffStrategy(null,
-					new CallbackBackoffStrategy($this->getBackoffCallback(), true,
-						new ExponentialBackoffStrategy()
-					)
-				)
-			)
-		)));
+		$client = $this->getClient();
+		$client->getEmitter()->attach($this->createExponentialBackoffSubscriber());
 
 		/** @var Request $request */
 		switch (strtolower($method)) {
 			case 'get':
-				$request = $client->get($url, $headers, $params);
+				$request = $client->get($url, [
+					'headers' => $headers,
+					'body' => $params
+				]);
 				break;
 			case 'post':
-				$request = $client->post($url, $headers, $params);
+				$request = $client->post($url, [
+					'headers' => $headers,
+					'body' => $params
+				]);
 				break;
 		}
 
