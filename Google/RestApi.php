@@ -25,6 +25,7 @@ class RestApi {
 	const USER_INFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
 
 	protected $nBackoffs = 5;
+	protected $backoffCallback403;
 
 	protected $accessToken;
 	protected $refreshToken;
@@ -38,11 +39,17 @@ class RestApi {
 		$this->clientId = $clientId;
 		$this->clientSecret = $clientSecret;
 		$this->setCredentials($accessToken, $refreshToken);
+		$this->backoffCallback403 = function () {};
 	}
 
 	public function setBackoffsCount($cnt)
 	{
 		$this->nBackoffs = $cnt;
+	}
+
+	public function setBackoffCallback403($function)
+	{
+		$this->backoffCallback403 = $function;
 	}
 
 	public function setCredentials($accessToken, $refreshToken)
@@ -200,6 +207,9 @@ class RestApi {
 					$tokens = $api->refreshToken();
 					$request->setHeader('Authorization', 'Bearer ' . $tokens['access_token']);
 				}
+				if ($response->getStatusCode() == 403) {
+					call_user_func($this->backoffCallback403, $response);
+				}
 				return true;
 			}
 		};
@@ -253,8 +263,8 @@ class RestApi {
 		}
 
 		$client = new HttpClient();
-		$client->addSubscriber(new BackoffPlugin(new TruncatedBackoffStrategy(3,
-			new HttpBackoffStrategy(array(403,500,502,503,504),
+		$client->addSubscriber(new BackoffPlugin(new TruncatedBackoffStrategy($this->nBackoffs,
+			new HttpBackoffStrategy(array(500,502,503,504),
 				new CurlBackoffStrategy(null,
 					new CallbackBackoffStrategy($this->getBackoffCallback(), true,
 						new ExponentialBackoffStrategy()
