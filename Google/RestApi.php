@@ -39,7 +39,9 @@ class RestApi {
 		$this->clientSecret = $clientSecret;
 		$this->setCredentials($accessToken, $refreshToken);
 
-		$this->backoffCallback403 = function () {};
+		$this->backoffCallback403 = function () {
+			return true;
+		};
 	}
 
 	protected function getClient($baseUrl = '')
@@ -212,10 +214,12 @@ class RestApi {
 				if ($response->getStatusCode() == 401) {
 					$tokens = $api->refreshToken();
 					$event->getRequest()->setHeader('Authorization', 'Bearer ' . $tokens['access_token']);
+
+					return true;
 				}
 
 				if ($response->getStatusCode() == 403) {
-					call_user_func($this->backoffCallback403, $response);
+					return call_user_func($this->backoffCallback403, $response);
 				}
 			}
 
