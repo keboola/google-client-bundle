@@ -281,6 +281,11 @@ class RestApi {
 					'headers' => $headers,
 					'body' => $params
 				]);
+			case 'put':
+				return $client->put($url, [
+					'headers' => $headers,
+					'body' => $params
+				]);
 		}
 
 		throw new RestApiException("Wrong http method specified", 500);
