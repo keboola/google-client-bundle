@@ -267,6 +267,7 @@ class RestApi {
 			}
 		}
 
+		/** @var Client $client */
 		$client = $this->getClient();
 		$client->getEmitter()->attach($this->createExponentialBackoffSubscriber());
 
@@ -285,6 +286,10 @@ class RestApi {
 				return $client->put($url, [
 					'headers' => $headers,
 					'body' => $params
+				]);
+			case 'delete':
+				return $client->delete($url, [
+					'headers' => $headers
 				]);
 		}
 
