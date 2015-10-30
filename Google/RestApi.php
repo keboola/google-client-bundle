@@ -187,7 +187,7 @@ class RestApi
             'headers' => [
                 'Content-Type' => 'application/x-www-form-urlencoded'
             ],
-            'body' => [
+            'form_params' => [
                 'code' => $code,
                 'client_id' => $this->clientId,
                 'client_secret' => $this->clientSecret,
