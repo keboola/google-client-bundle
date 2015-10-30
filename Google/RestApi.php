@@ -185,8 +185,7 @@ class RestApi
 
         $response = $client->request('post', '/oauth2/v3/token', [
             'headers' => [
-                'Content-Type' => 'application/x-www-form-urlencoded',
-                'Content-Transfer-Encoding' => 'binary'
+                'Content-Type' => 'application/x-www-form-urlencoded'
             ],
             'body' => [
                 'code' => $code,
@@ -211,7 +210,7 @@ class RestApi
 
         $response = $client->request('post', '/oauth2/v3/token', [
             'headers' => [
-                'Content-Type' => 'application/x-www-form-urlencoded',
+                'Content-Type' => 'application/x-www-form-urlencoded'
             ],
             'form_params' => [
                 'refresh_token' => $this->refreshToken,
@@ -283,11 +282,12 @@ class RestApi
 
         switch (strtolower($method)) {
             case 'get':
-                return $client->request('get', $url, [
+                return $client->get($url, [
                     'headers' => $headers,
                     'query' => $params
                 ]);
             case 'post':
+            case 'put':
                 $options = [
                     'headers' => $headers
                 ];
@@ -299,13 +299,7 @@ class RestApi
                         $options['json'] = $params;
                     }
                 }
-
-                return $client->request('post', $url, $options);
-            case 'put':
-                return $client->put($url, [
-                    'headers' => $headers,
-                    'body' => $params
-                ]);
+                return $client->$method($url, $options);
             case 'delete':
                 return $client->delete($url, [
                     'headers' => $headers
