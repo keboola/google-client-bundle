@@ -1,33 +1,62 @@
 <?php
 /**
- * RestApiTest.php
- *
- * @author: Miroslav Čillík <miro@keboola.com>
- * @created: 24.6.13
+ * Created by PhpStorm.
+ * User: miroslavcillik
+ * Date: 29/10/15
+ * Time: 17:06
  */
 
-namespace Keboola\Google\ClientBundle\Tests;
+namespace Keboola\Google\ClientBundle\Google;
 
-use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
-use Guzzle\Service\Client;
-
-class RestApiTest extends WebTestCase
+class RestApiTest extends \PHPUnit_Framework_TestCase
 {
+    private $clientId;
 
-	public function testGetUserinfo()
-	{
-		$storageApiToken = '226-420796630473d70ca6a1505624bb6db871553892';
+    private $clientSecret;
 
-		$host = 'http://google-client.awsdevel.keboola.com/api-google';
-		$client = new Client($host);
+    protected function initApi()
+    {
+        $this->clientId = getenv('CLIENT_ID');
+        $this->clientSecret = getenv('CLIENT_SECRET');
+        $refreshToken = getenv('REFRESH_TOKEN');
 
-		$accesToken = 'ya29.AHES6ZRt-vLacLwH9pe4aL4ahcIbba47Ed2EQ8kdBG3yXXk';
-		$refreshToken = '1/jPkPndXe8QiIOP2nNrocpjsa41LPyPW90T63GxBmtOY';
+        $restApi = new RestApi($this->clientId, $this->clientSecret, null, $refreshToken);
 
-//		$request = $client->get($host . '/user-info?access_token=' . $accesToken . '&refresh_token=' . $refreshToken);
-		$request = $client->get("/user-info");
-		$response = $request->send();
+        return $restApi;
+    }
 
-		var_dump($response->json());
-	}
+    public function testGetAuthorizationUrl()
+    {
+        $restApi = $this->initApi();
+        $url = $restApi->getAuthorizationUrl('www.something.com', 'email', 'force', 'offline', 'state');
+
+        $expectedUrl = RestApi::OAUTH_URL . '?response_type=code'
+            . '&redirect_uri=www.something.com'
+            . '&client_id=' . $this->clientId
+            . '&scope=email'
+            . '&access_type=offline'
+            . '&approval_prompt=force'
+            . '&state=state';
+
+        $this->assertEquals($expectedUrl, $url);
+    }
+
+    public function testRefreshToken()
+    {
+        $restApi = $this->initApi();
+        $response = $restApi->refreshToken();
+
+        $this->assertArrayHasKey('access_token', $response);
+    }
+
+    public function testRequest()
+    {
+        $restApi = $this->initApi();
+        $response = $restApi->request('/oauth2/v3/userinfo');
+        $body = json_decode($response->getBody(), true);
+
+        $this->assertArrayHasKey('sub', $body);
+        $this->assertArrayHasKey('email', $body);
+        $this->assertArrayHasKey('name', $body);
+    }
 }

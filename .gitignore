@@ -5,6 +5,7 @@ composer.lock
 composer.phar
 tmp
 vendor/*
+runtest.sh
 
 # osx noise
 .DS_Store

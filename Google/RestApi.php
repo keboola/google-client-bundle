@@ -8,21 +8,21 @@
 
 namespace Keboola\Google\ClientBundle\Google;
 
-use Guzzle\Http\Message\Request;
-use Guzzle\Http\Message\Response;
-use Guzzle\Plugin\Backoff\CallbackBackoffStrategy;
-use Guzzle\Plugin\Backoff\CurlBackoffStrategy;
-use Guzzle\Plugin\Backoff\ExponentialBackoffStrategy;
-use Guzzle\Plugin\Backoff\HttpBackoffStrategy;
-use Guzzle\Plugin\Backoff\TruncatedBackoffStrategy;
-use Guzzle\Service\Client as HttpClient;
-use Guzzle\Plugin\Backoff\BackoffPlugin;
+use GuzzleHttp\Client;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Response;
 use Keboola\Google\ClientBundle\Exception\RestApiException;
+use Keboola\Google\ClientBundle\Guzzle\RetryCallbackMiddleware;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 
 class RestApi {
+
+    const API_URI = 'https://www.googleapis.com';
 	const OAUTH_URL = 'https://accounts.google.com/o/oauth2/auth';
-	const OAUTH_TOKEN_URL = 'https://accounts.google.com/o/oauth2/token';
-	const USER_INFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
+
+	protected $maxBackoffs = 7;
+	protected $backoffCallback403;
 
 	protected $accessToken;
 	protected $refreshToken;
@@ -36,6 +36,82 @@ class RestApi {
 		$this->clientId = $clientId;
 		$this->clientSecret = $clientSecret;
 		$this->setCredentials($accessToken, $refreshToken);
+
+		$this->backoffCallback403 = function () {
+			return true;
+		};
+	}
+
+    public static function createRetryMiddleware(callable $decider, callable $callback, callable $delay = null)
+    {
+        return function (callable $handler) use ($decider, $callback, $delay) {
+            return new RetryCallbackMiddleware($decider, $callback, $handler, $delay);
+        };
+    }
+
+    public function createRetryDecider($maxRetries = 5)
+    {
+        return function (
+            $retries,
+            RequestInterface $request,
+            ResponseInterface $response = null,
+            $error = null
+        ) use ($maxRetries) {
+            if ($response) {
+
+                if ($retries >= $maxRetries) {
+                    return false;
+                } else if ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
+                    return false;
+                } else if ($response->getStatusCode() == 401) {
+                    return true;
+                } else if ($response->getStatusCode() == 403) {
+                    return call_user_func($this->backoffCallback403, $response);
+                }
+            }
+            return true;
+        };
+    }
+
+    public function createRetryCallback()
+    {
+        $api = $this;
+
+        return function (
+            RequestInterface $request,
+            ResponseInterface $response = null
+        ) use ($api) {
+            if ($response->getStatusCode() == 401) {
+                $tokens = $api->refreshToken();
+                return $request->withHeader('Authorization', 'Bearer ' . $tokens['access_token']);
+            }
+            return $request;
+        };
+    }
+
+	protected function getClient($baseUri = self::API_URI)
+	{
+        $handlerStack = HandlerStack::create();
+
+        $handlerStack->push(self::createRetryMiddleware(
+            $this->createRetryDecider($this->maxBackoffs),
+            $this->createRetryCallback()
+        ));
+
+		return new Client([
+			'base_uri' => $baseUri,
+            'handler' => $handlerStack
+		]);
+	}
+
+	public function setBackoffsCount($cnt)
+	{
+		$this->maxBackoffs = $cnt;
+	}
+
+	public function setBackoffCallback403($function)
+	{
+		$this->backoffCallback403 = $function;
 	}
 
 	public function setCredentials($accessToken, $refreshToken)
@@ -101,85 +177,62 @@ class RestApi {
 	 * @param String $code - authorization code
 	 * @param $redirectUri
 	 * @throws \Keboola\Google\ClientBundle\Exception\RestApiException
-	 * @return array accessToken, refreshToken
+	 * @return array accessToken, refreshTokenp
 	 */
 	public function authorize($code, $redirectUri)
 	{
-		$client = new HttpClient();
-		$request = $client->post(self::OAUTH_TOKEN_URL, array(
-			'Content-Type'	=> 'application/x-www-form-urlencoded',
-			'Content-Transfer-Encoding' => 'binary'
-		), array(
-			'code'	        => $code,
-			'client_id'	    => $this->clientId,
-			'client_secret'	=> $this->clientSecret,
-			'redirect_uri'	=> $redirectUri,
-			'grant_type'	=> 'authorization_code'
-		));
+		$client = $this->getClient();
 
-		$response = $request->send();
+		$response = $client->request('post', '/oauth2/v3/token',  [
+			'headers' => [
+				'Content-Type' => 'application/x-www-form-urlencoded',
+				'Content-Transfer-Encoding' => 'binary'
+			],
+			'body' => [
+				'code' => $code,
+				'client_id' => $this->clientId,
+				'client_secret'	=> $this->clientSecret,
+				'redirect_uri' => $redirectUri,
+				'grant_type' => 'authorization_code'
+			]
+		]);
 
-		if ($response->getStatusCode() != 200) {
-			throw new RestApiException($response->getStatusCode(), $response->getMessage());
-		}
+        $responseBody = json_decode($response->getBody(), true);
 
-		$body = $response->json();
+		$this->accessToken = $responseBody['access_token'];
+		$this->refreshToken = $responseBody['refresh_token'];
 
-		$this->accessToken = $body['access_token'];
-		$this->refreshToken = $body['refresh_token'];
-
-		return $body;
+		return $responseBody;
 	}
 
 	public function refreshToken()
 	{
-		$client = new HttpClient();
-		$request = $client->post(self::OAUTH_TOKEN_URL, array(
-			'Content-Type'	=> 'application/x-www-form-urlencoded',
-			'Content-Transfer-Encoding' => 'binary'
-		), array(
-			'refresh_token'	=> $this->refreshToken,
-			'client_id'		=> $this->clientId,
-			'client_secret' => $this->clientSecret,
-			'grant_type'	=> 'refresh_token'
-		));
+        $client = new Client(['base_uri' => self::API_URI]);
 
-		$response = $request->send();
+        $response = $client->request('post', '/oauth2/v3/token', [
+            'headers' => [
+                'Content-Type' => 'application/x-www-form-urlencoded',
+            ],
+            'form_params' => [
+                'refresh_token'	=> $this->refreshToken,
+                'client_id' => $this->clientId,
+                'client_secret' => $this->clientSecret,
+                'grant_type' => 'refresh_token'
+            ]
+        ]);
 
-		if ($response->getStatusCode() != 200) {
-			throw new RestApiException($response->getStatusCode(), $response->getMessage());
-		}
+        $responseBody = json_decode($response->getBody(), true);
 
-		$body = $response->json();
-
-		$this->accessToken = $body['access_token'];
-		if (isset($body['refresh_token'])) {
-			$this->refreshToken = $body['refresh_token'];
+		$this->accessToken = $responseBody['access_token'];
+		if (isset($responseBody['refresh_token'])) {
+			$this->refreshToken = $responseBody['refresh_token'];
 		}
 
 		if ($this->refreshTokenCallback != null) {
 			call_user_func($this->refreshTokenCallback, $this->accessToken, $this->refreshToken);
 		}
 
-		return $body;
-	}
-
-	public function getBackoffCallback()
-	{
-		$api = $this;
-		return function($retries, Request $request, Response $response, $e) use ($api) {
-			if ($response) {
-				//Short circuit the rest of the checks if it was successful
-				if ($response->isSuccessful()) {
-					return false;
-				}
-				if ($response->getStatusCode() == 401) {
-					$tokens = $api->refreshToken();
-					$request->setHeader('Authorization', 'Bearer ' . $tokens['access_token']);
-				}
-				return true;
-			}
-		};
+		return $responseBody;
 	}
 
 	/**
@@ -191,37 +244,33 @@ class RestApi {
 	 * @param Array $params
 	 * @throws RestApiException
 	 * @return Response $response
+     * @deprecated use request() instead
 	 */
 	public function call($url, $method = 'GET', $addHeaders = array(), $params = array())
 	{
-		/** @var Response $response */
-		$response = $this->request($url, $method, $addHeaders, $params)->send();
-
-		if ($response->getStatusCode() != 200) {
-			throw new RestApiException($response->getStatusCode(), $response->getMessage());
-		}
-
-		return $response;
+		return $this->request($url, $method, $addHeaders, $params);
 	}
 
 	/**
+     * Call Google REST API
+     *
 	 * @param $url
 	 * @param string $method
 	 * @param array $addHeaders
 	 * @param array $params
-	 * @return Request
-	 * @throws \Keboola\Google\ClientBundle\Exception\RestApiException
+	 * @return Response
+	 * @throws RestApiException
 	 */
 	public function request($url, $method = 'GET', $addHeaders = array(), $params = array())
 	{
-		if (null == $this->accessToken) {
-			throw new RestApiException(400, "Access Token must be set");
+		if (null == $this->refreshToken) {
+			throw new RestApiException("Refresh token must be set", 400);
 		}
 
-		$headers = array(
+		$headers = [
 			'Accept' => 'application/json',
 			'Authorization'	=> 'Bearer ' . $this->accessToken
-		);
+		];
 
 		if (null != $addHeaders && is_array($addHeaders)) {
 			foreach($addHeaders as $k => $v) {
@@ -229,28 +278,41 @@ class RestApi {
 			}
 		}
 
-		$client = new HttpClient();
-		$client->addSubscriber(new BackoffPlugin(new TruncatedBackoffStrategy(3,
-			new HttpBackoffStrategy(null,
-				new CurlBackoffStrategy(null,
-					new CallbackBackoffStrategy($this->getBackoffCallback(), true,
-						new ExponentialBackoffStrategy()
-					)
-				)
-			)
-		)));
+		/** @var Client $client */
+		$client = $this->getClient();
 
-		/** @var Request $request */
 		switch (strtolower($method)) {
 			case 'get':
-				$request = $client->get($url, $headers);
-				break;
+				return $client->request('get', $url, [
+					'headers' => $headers,
+					'query' => $params
+				]);
 			case 'post':
-				$request = $client->post($url, $headers, $params);
-				break;
+                $options = [
+                    'headers' => $headers
+                ];
+
+                if (isset($headers['Content-Type'])) {
+                    if ($headers['Content-Type'] == 'application/x-www-form-urlencoded') {
+                        $options['form_params'] = $params;
+                    } else if ($headers['Content-Type'] == 'application/json') {
+                        $options['json'] = $params;
+                    }
+                }
+
+				return $client->request('post', $url, $options);
+			case 'put':
+				return $client->put($url, [
+					'headers' => $headers,
+					'body' => $params
+				]);
+			case 'delete':
+				return $client->delete($url, [
+					'headers' => $headers
+				]);
 		}
 
-		return $request;
+		throw new RestApiException("Wrong http method specified", 500);
 	}
 }
 

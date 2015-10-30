@@ -2,7 +2,7 @@
 	"name": "keboola/google-client-bundle",
 	"type": "symfony-bundle",
 	"description": "Keboola Google API Client",
-	"keywords": [],
+	"keywords": ["keboola", "google", "rest", "client"],
 	"authors": [
 		{
 			"name": "Miroslav Čillík",
@@ -10,34 +10,15 @@
 		}
 	],
 	"require": {
-		"php": ">=5.3.5"
+		"php": ">=5.4.0",
+		"guzzlehttp/guzzle": "^6.0"
 	},
 	"require-dev": {
-		"syrup/component-bundle": "1.2.*",
-		"syrup/development-bundle": "1.1.*"
-	},
-	"scripts": {
-		"post-install-cmd": [
-			"Incenteev\\ParameterHandler\\ScriptHandler::buildParameters",
-			"Sensio\\Bundle\\DistributionBundle\\Composer\\ScriptHandler::buildBootstrap"
-		],
-		"post-update-cmd": [
-			"Incenteev\\ParameterHandler\\ScriptHandler::buildParameters",
-			"Sensio\\Bundle\\DistributionBundle\\Composer\\ScriptHandler::buildBootstrap",
-			"Sensio\\Bundle\\DistributionBundle\\Composer\\ScriptHandler::clearCache"
-		]
+	  	"phpunit/phpunit": "3.7.*"
 	},
 	"minimum-stability": "stable",
 	"autoload": {
 		"psr-0": { "Keboola\\Google\\ClientBundle": "" }
 	},
-	"target-dir": "Keboola/Google/ClientBundle",
-	"extra": {
-		"symfony-app-dir": "vendor/syrup/development-bundle/app",
-		"symfony-web-dir": "vendor/syrup/development-bundle/web",
-		"incenteev-parameters": {
-			"keep-outdated": true,
-			"file": "vendor/syrup/development-bundle/app/config/parameters.yml"
-		}
-	}
+	"target-dir": "Keboola/Google/ClientBundle"
 }
