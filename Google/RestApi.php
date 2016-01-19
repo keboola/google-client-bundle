@@ -237,31 +237,20 @@ class RestApi
     /**
      * Call Google REST API
      *
-     * @param String $url
-     * @param String $method
-     * @param Array $addHeaders
-     * @param Array $params
-     * @throws RestApiException
-     * @return Response $response
-     * @deprecated use request() instead
-     */
-    public function call($url, $method = 'GET', $addHeaders = array(), $params = array())
-    {
-        return $this->request($url, $method, $addHeaders, $params);
-    }
-
-    /**
-     * Call Google REST API
-     *
      * @param $url
      * @param string $method
      * @param array $addHeaders
-     * @param array $params
+     * @param $options
      * @return Response
      * @throws RestApiException
      */
-    public function request($url, $method = 'GET', $addHeaders = array(), $params = array())
+    public function request($url, $method = 'GET', $addHeaders = [], $options = [])
     {
+        $method = strtolower($method);
+        if (!in_array($method, ['get', 'head', 'post', 'put', 'patch', 'delete', 'options'])) {
+            throw new RestApiException("Wrong http method specified", 500);
+        }
+
         if (null == $this->refreshToken) {
             throw new RestApiException("Refresh token must be set", 400);
         }
@@ -277,36 +266,9 @@ class RestApi
             }
         }
 
-        /** @var Client $client */
-        $client = $this->getClient();
+        $options['headers'] = $headers;
 
-        switch (strtolower($method)) {
-            case 'get':
-                return $client->get($url, [
-                    'headers' => $headers,
-                    'query' => $params
-                ]);
-            case 'post':
-            case 'put':
-                $options = [
-                    'headers' => $headers
-                ];
-
-                if (isset($headers['Content-Type'])) {
-                    if ($headers['Content-Type'] == 'application/x-www-form-urlencoded') {
-                        $options['form_params'] = $params;
-                    } else if ($headers['Content-Type'] == 'application/json') {
-                        $options['json'] = $params;
-                    }
-                }
-                return $client->$method($url, $options);
-            case 'delete':
-                return $client->delete($url, [
-                    'headers' => $headers
-                ]);
-        }
-
-        throw new RestApiException("Wrong http method specified", 500);
+        return $this->getClient()->$method($url, $options);
     }
 }
 
