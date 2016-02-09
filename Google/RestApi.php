@@ -67,6 +67,8 @@ class RestApi
                     return true;
                 } else if ($response->getStatusCode() == 403) {
                     return call_user_func($this->backoffCallback403, $response);
+                } else if ($response->getStatusCode() >= 500 && $response->getStatusCode() < 600) {
+                    return true;
                 }
             }
             return true;
