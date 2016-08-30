@@ -61,13 +61,21 @@ class RestApi
             if ($response) {
                 if ($retries >= $maxRetries) {
                     return false;
-                } else if ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
+                }
+                $statusCode = $response->getStatusCode();
+                if ($statusCode >= 200 && $statusCode < 300) {
                     return false;
-                } else if ($response->getStatusCode() == 401) {
+                }
+                if ($statusCode == 401) {
                     return true;
-                } else if ($response->getStatusCode() == 403) {
+                }
+                if ($statusCode == 403) {
                     return call_user_func($this->backoffCallback403, $response);
-                } else if ($response->getStatusCode() >= 500 && $response->getStatusCode() < 600) {
+                }
+                if ($statusCode == 429) {
+                    return true;
+                }
+                if ($statusCode >= 500 && $statusCode < 600) {
                     return true;
                 }
             }
