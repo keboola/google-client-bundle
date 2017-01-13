@@ -99,13 +99,21 @@ class RestApi
         };
     }
 
+    public function createRetryDelayExponential()
+    {
+        return function ($retries) {
+            return pow(2, $retries);
+        };
+    }
+
     protected function getClient($baseUri = self::API_URI)
     {
         $handlerStack = HandlerStack::create();
 
         $handlerStack->push(self::createRetryMiddleware(
             $this->createRetryDecider($this->maxBackoffs),
-            $this->createRetryCallback()
+            $this->createRetryCallback(),
+            $this->createRetryDelayExponential()
         ));
 
         return new Client([
