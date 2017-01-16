@@ -102,7 +102,7 @@ class RestApi
     public function createRetryDelayExponential()
     {
         return function ($retries) {
-            return pow(2, $retries);
+            return 1000 * pow(2, $retries) + rand(0, 1000);
         };
     }
 
