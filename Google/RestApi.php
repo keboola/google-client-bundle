@@ -23,7 +23,7 @@ class RestApi
     const API_URI = 'https://www.googleapis.com';
     const OAUTH_URL = 'https://accounts.google.com/o/oauth2/auth';
 
-    protected $maxBackoffs = 8;
+    protected $maxBackoffs = 7;
     protected $backoffCallback403;
 
     protected $accessToken;
