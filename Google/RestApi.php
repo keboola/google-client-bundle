@@ -9,6 +9,7 @@
 namespace Keboola\Google\ClientBundle\Google;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Handler\CurlHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
 use Keboola\Google\ClientBundle\Exception\RestApiException;
@@ -22,7 +23,7 @@ class RestApi
     const API_URI = 'https://www.googleapis.com';
     const OAUTH_URL = 'https://accounts.google.com/o/oauth2/auth';
 
-    protected $maxBackoffs = 7;
+    protected $maxBackoffs = 8;
     protected $backoffCallback403;
 
     protected $accessToken;
@@ -99,21 +100,13 @@ class RestApi
         };
     }
 
-    public function createRetryDelayExponential()
-    {
-        return function ($retries) {
-            return 1000 * pow(2, $retries) + rand(0, 1000);
-        };
-    }
-
     protected function getClient($baseUri = self::API_URI)
     {
-        $handlerStack = HandlerStack::create();
+        $handlerStack = HandlerStack::create(new CurlHandler());
 
         $handlerStack->push(self::createRetryMiddleware(
             $this->createRetryDecider($this->maxBackoffs),
-            $this->createRetryCallback(),
-            $this->createRetryDelayExponential()
+            $this->createRetryCallback()
         ));
 
         return new Client([

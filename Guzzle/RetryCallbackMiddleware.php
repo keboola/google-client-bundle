@@ -61,7 +61,7 @@ class RetryCallbackMiddleware
      */
     public static function exponentialDelay($retries)
     {
-        return (int) pow(2, $retries - 1);
+        return (int) (pow(2, $retries - 1) + rand(0, 10));
     }
 
     /**
