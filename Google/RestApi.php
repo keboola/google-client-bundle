@@ -21,7 +21,7 @@ class RestApi
 {
 
     const API_URI = 'https://www.googleapis.com';
-    const OAUTH_URL = 'https://accounts.google.com/o/oauth2/auth';
+    const OAUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 
     protected $maxBackoffs = 7;
     protected $backoffCallback403;
@@ -194,7 +194,7 @@ class RestApi
     {
         $client = $this->getClient();
 
-        $response = $client->request('post', '/oauth2/v3/token', [
+        $response = $client->request('post', '/oauth2/v4/token', [
             'headers' => [
                 'Content-Type' => 'application/x-www-form-urlencoded'
             ],
@@ -219,7 +219,7 @@ class RestApi
     {
         $client = new Client(['base_uri' => self::API_URI]);
 
-        $response = $client->request('post', '/oauth2/v3/token', [
+        $response = $client->request('post', '/oauth2/v4/token', [
             'headers' => [
                 'Content-Type' => 'application/x-www-form-urlencoded'
             ],

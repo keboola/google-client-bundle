@@ -6,6 +6,7 @@ composer.phar
 tmp
 vendor/*
 runtest.sh
+.env
 
 # osx noise
 .DS_Store
