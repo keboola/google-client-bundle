@@ -14,6 +14,7 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
 use Keboola\Google\ClientBundle\Exception\RestApiException;
 use Keboola\Google\ClientBundle\Guzzle\RetryCallbackMiddleware;
+use Monolog\Logger;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
@@ -33,11 +34,15 @@ class RestApi
 
     protected $refreshTokenCallback;
 
-    public function __construct($clientId, $clientSecret, $accessToken = null, $refreshToken = null)
+    /** @var Logger */
+    protected $logger;
+
+    public function __construct($clientId, $clientSecret, $accessToken = null, $refreshToken = null, $logger = null)
     {
         $this->clientId = $clientId;
         $this->clientSecret = $clientSecret;
         $this->setCredentials($accessToken, $refreshToken);
+        $this->logger = $logger;
 
         $this->backoffCallback403 = function () {
             return true;
@@ -92,6 +97,20 @@ class RestApi
             RequestInterface $request,
             ResponseInterface $response = null
         ) use ($api) {
+            if ($this->logger !== null) {
+                $this->logger->debug("Retrying request", [
+                    'request' => [
+                        'uri' => $request->getUri(),
+                        'method' => $request->getMethod(),
+                        'body' => $request->getBody()->getContents()
+                    ],
+                    'response' => [
+                        'statusCode' => $response->getStatusCode(),
+                        'reason' => $response->getReasonPhrase(),
+                        'body' => $response->getBody()->getContents()
+                    ]
+                ]);
+            }
             if ($response->getStatusCode() == 401) {
                 $tokens = $api->refreshToken();
                 return $request->withHeader('Authorization', 'Bearer ' . $tokens['access_token']);
@@ -120,7 +139,11 @@ class RestApi
         $this->maxBackoffs = $cnt;
     }
 
-    public function setBackoffCallback403($function)
+    /**
+     * Set decider function which will decide whether to retry or not on 403 response code
+     * @param callable $function
+     */
+    public function setBackoffCallback403(callable $function)
     {
         $this->backoffCallback403 = $function;
     }
