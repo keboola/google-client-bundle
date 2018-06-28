@@ -64,28 +64,12 @@ class RestApi
             ResponseInterface $response = null,
             $error = null
         ) use ($maxRetries) {
-            if ($response) {
-                if ($retries >= $maxRetries) {
-                    return false;
-                }
-                $statusCode = $response->getStatusCode();
-                if ($statusCode >= 200 && $statusCode < 300) {
-                    return false;
-                }
-                if ($statusCode == 401) {
-                    return true;
-                }
-                if ($statusCode == 403) {
-                    return call_user_func($this->backoffCallback403, $response);
-                }
-                if ($statusCode == 429) {
-                    return true;
-                }
-                if ($statusCode >= 500 && $statusCode < 600) {
-                    return true;
-                }
+            $decision = $this->decideRetry($retries, $maxRetries, $response);
+            if ($decision) {
+                $this->logRetryRequest($retries, $request, $response);
             }
-            return true;
+
+            return $decision;
         };
     }
 
@@ -97,27 +81,6 @@ class RestApi
             RequestInterface $request,
             ResponseInterface $response = null
         ) use ($api) {
-            if ($this->logger !== null) {
-                $headersForLog = array_map(function ($item, $key) {
-                    if (strtolower($key) === 'authorization') {
-                        return '*****';
-                    }
-                    return $item;
-                }, $request->getHeaders());
-                $this->logger->info("Retrying request", [
-                    'request' => [
-                        'uri' => $request->getUri()->__toString(),
-                        'headers' => $headersForLog,
-                        'method' => $request->getMethod(),
-                        'body' => $request->getBody()->getContents()
-                    ],
-                    'response' => [
-                        'statusCode' => $response->getStatusCode(),
-                        'reason' => $response->getReasonPhrase(),
-                        'body' => $response->getBody()->getContents()
-                    ]
-                ]);
-            }
             if ($response->getStatusCode() == 401) {
                 $tokens = $api->refreshToken();
                 return $request->withHeader('Authorization', 'Bearer ' . $tokens['access_token']);
@@ -310,6 +273,57 @@ class RestApi
         $options['headers'] = $headers;
 
         return $this->getClient()->$method($url, $options);
+    }
+
+    protected function logRetryRequest($retries, RequestInterface $request, ResponseInterface $response)
+    {
+        if ($this->logger !== null) {
+            $headersForLog = array_map(function ($item, $key) {
+                if (strtolower($key) === 'authorization') {
+                    return '*****';
+                }
+                return $item;
+            }, $request->getHeaders(), array_keys($request->getHeaders()));
+            $this->logger->info(sprintf("Retrying request (%sx)", $retries), [
+                'request' => [
+                    'uri' => $request->getUri()->__toString(),
+                    'headers' => $headersForLog,
+                    'method' => $request->getMethod(),
+                    'body' => $request->getBody()->getContents()
+                ],
+                'response' => [
+                    'statusCode' => $response->getStatusCode(),
+                    'reason' => $response->getReasonPhrase(),
+                    'body' => $response->getBody()->getContents()
+                ],
+            ]);
+        }
+    }
+
+    protected function decideRetry($retries, $maxRetries, ResponseInterface $response)
+    {
+        if ($response) {
+            if ($retries >= $maxRetries) {
+                return false;
+            }
+            $statusCode = $response->getStatusCode();
+            if ($statusCode >= 200 && $statusCode < 300) {
+                return false;
+            }
+            if ($statusCode == 401) {
+                return true;
+            }
+            if ($statusCode == 403) {
+                return call_user_func($this->backoffCallback403, $response);
+            }
+            if ($statusCode == 429) {
+                return true;
+            }
+            if ($statusCode >= 500 && $statusCode < 600) {
+                return true;
+            }
+        }
+        return true;
     }
 }
 

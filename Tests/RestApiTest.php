@@ -8,6 +8,8 @@
 
 namespace Keboola\Google\ClientBundle\Google;
 
+use Monolog\Logger;
+
 class RestApiTest extends \PHPUnit_Framework_TestCase
 {
     private $clientId;
@@ -20,7 +22,9 @@ class RestApiTest extends \PHPUnit_Framework_TestCase
         $this->clientSecret = getenv('CLIENT_SECRET');
         $refreshToken = getenv('REFRESH_TOKEN');
 
-        $restApi = new RestApi($this->clientId, $this->clientSecret, null, $refreshToken);
+        $logger = new Logger('Google Rest API tests');
+
+        $restApi = new RestApi($this->clientId, $this->clientSecret, null, $refreshToken, $logger);
 
         return $restApi;
     }
