@@ -98,9 +98,16 @@ class RestApi
             ResponseInterface $response = null
         ) use ($api) {
             if ($this->logger !== null) {
-                $this->logger->debug("Retrying request", [
+                $headersForLog = array_map(function ($item, $key) {
+                    if (strtolower($key) === 'authorization') {
+                        return '*****';
+                    }
+                    return $item;
+                }, $request->getHeaders());
+                $this->logger->info("Retrying request", [
                     'request' => [
-                        'uri' => $request->getUri(),
+                        'uri' => $request->getUri()->__toString(),
+                        'headers' => $headersForLog,
                         'method' => $request->getMethod(),
                         'body' => $request->getBody()->getContents()
                     ],
