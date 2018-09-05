@@ -34,15 +34,25 @@ class RestApi
 
     protected $refreshTokenCallback;
 
+    /** @var callable */
+    protected $delayFn = null;
+
     /** @var Logger */
     protected $logger;
 
-    public function __construct($clientId, $clientSecret, $accessToken = null, $refreshToken = null, $logger = null)
-    {
+    public function __construct(
+        $clientId,
+        $clientSecret,
+        $accessToken = null,
+        $refreshToken = null,
+        $logger = null,
+        $dalayFn = null
+    ) {
         $this->clientId = $clientId;
         $this->clientSecret = $clientSecret;
         $this->setCredentials($accessToken, $refreshToken);
         $this->logger = $logger;
+        $this->delayFn = $dalayFn;
 
         $this->backoffCallback403 = function () {
             return true;
@@ -95,7 +105,8 @@ class RestApi
 
         $handlerStack->push(self::createRetryMiddleware(
             $this->createRetryDecider($this->maxBackoffs),
-            $this->createRetryCallback()
+            $this->createRetryCallback(),
+            $this->delayFn
         ));
 
         return new Client([

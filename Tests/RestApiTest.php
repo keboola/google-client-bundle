@@ -16,15 +16,25 @@ class RestApiTest extends \PHPUnit_Framework_TestCase
 
     private $clientSecret;
 
-    protected function initApi()
+    private $refreshToken;
+
+    private $logger;
+
+    protected function initApi($delayFn = null)
     {
         $this->clientId = getenv('CLIENT_ID');
         $this->clientSecret = getenv('CLIENT_SECRET');
-        $refreshToken = getenv('REFRESH_TOKEN');
+        $this->refreshToken = getenv('REFRESH_TOKEN');
+        $this->logger = new Logger('Google Rest API tests');
 
-        $logger = new Logger('Google Rest API tests');
-
-        $restApi = new RestApi($this->clientId, $this->clientSecret, null, $refreshToken, $logger);
+        $restApi = new RestApi(
+            $this->clientId,
+            $this->clientSecret,
+            null,
+            $this->refreshToken,
+            $this->logger,
+            $delayFn
+        );
 
         return $restApi;
     }
@@ -62,5 +72,27 @@ class RestApiTest extends \PHPUnit_Framework_TestCase
         $this->assertArrayHasKey('sub', $body);
         $this->assertArrayHasKey('email', $body);
         $this->assertArrayHasKey('name', $body);
+    }
+
+    public function testDelayFn()
+    {
+        \PHP_Timer::start();
+
+        $delayFn = function ($retries) {
+            return (int) (5000 * pow(2, $retries - 1) + rand(0, 500));
+        };
+
+        $restApi = $this->initApi($delayFn);
+        $response = $restApi->request('/oauth2/v3/userinfo');
+
+        \PHP_Timer::stop();
+        $time = \PHP_Timer::timeSinceStartOfRequest();
+
+        $body = json_decode($response->getBody(), true);
+
+        $this->assertArrayHasKey('sub', $body);
+        $this->assertArrayHasKey('email', $body);
+        $this->assertArrayHasKey('name', $body);
+        $this->assertGreaterThan(5, $time);
     }
 }

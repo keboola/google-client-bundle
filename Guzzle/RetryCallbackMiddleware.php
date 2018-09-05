@@ -1,12 +1,7 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: miroslavcillik
- * Date: 30/10/15
- * Time: 12:23
- */
 
 namespace Keboola\Google\ClientBundle\Guzzle;
+
 use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\Promise\RejectedPromise;
 use Psr\Http\Message\RequestInterface;
@@ -26,6 +21,9 @@ class RetryCallbackMiddleware
 
     /** @var callable */
     private $callback;
+
+    /** @var callable */
+    private $delay;
 
     /**
      * @param callable $decider     Function that accepts the number of retries,
