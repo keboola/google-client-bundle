@@ -45,14 +45,12 @@ class RestApi
         $clientSecret,
         $accessToken = null,
         $refreshToken = null,
-        $logger = null,
-        $dalayFn = null
+        $logger = null
     ) {
         $this->clientId = $clientId;
         $this->clientSecret = $clientSecret;
         $this->setCredentials($accessToken, $refreshToken);
         $this->logger = $logger;
-        $this->delayFn = $dalayFn;
 
         $this->backoffCallback403 = function () {
             return true;
@@ -113,6 +111,11 @@ class RestApi
             'base_uri' => $baseUri,
             'handler' => $handlerStack
         ]);
+    }
+
+    public function setDelayFn(callable $delayFn)
+    {
+        $this->delayFn = $delayFn;
     }
 
     public function setBackoffsCount($cnt)

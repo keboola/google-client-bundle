@@ -20,23 +20,20 @@ class RestApiTest extends \PHPUnit_Framework_TestCase
 
     private $logger;
 
-    protected function initApi($delayFn = null)
+    protected function initApi()
     {
         $this->clientId = getenv('CLIENT_ID');
         $this->clientSecret = getenv('CLIENT_SECRET');
         $this->refreshToken = getenv('REFRESH_TOKEN');
         $this->logger = new Logger('Google Rest API tests');
 
-        $restApi = new RestApi(
+        return new RestApi(
             $this->clientId,
             $this->clientSecret,
             null,
             $this->refreshToken,
-            $this->logger,
-            $delayFn
+            $this->logger
         );
-
-        return $restApi;
     }
 
     public function testGetAuthorizationUrl()
@@ -82,7 +79,9 @@ class RestApiTest extends \PHPUnit_Framework_TestCase
             return (int) (5000 * pow(2, $retries - 1) + rand(0, 500));
         };
 
-        $restApi = $this->initApi($delayFn);
+        $restApi = $this->initApi();
+        $restApi->setDelayFn($delayFn);
+
         $response = $restApi->request('/oauth2/v3/userinfo');
 
         \PHP_Timer::stop();
