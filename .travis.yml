@@ -1,0 +1,19 @@
+sudo: required
+
+language: bash
+
+services:
+  - docker
+
+install:
+  - docker-compose run --rm tests composer install -n
+  - docker-compose build tests
+
+script:
+  - docker-compose run --rm tests
+
+after_error:
+  - docker-compose logs
+
+after_failure:
+  - docker-compose logs
