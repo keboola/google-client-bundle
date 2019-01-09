@@ -194,7 +194,7 @@ class RestApi
      *
      * @param String $code - authorization code
      * @param $redirectUri
-     * @throws \Keboola\Google\ClientBundle\Exception\RestApiException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      * @return array accessToken, refreshTokenp
      */
     public function authorize($code, $redirectUri)
@@ -330,17 +330,11 @@ class RestApi
             if ($statusCode >= 200 && $statusCode < 300) {
                 return false;
             }
-            if ($statusCode == 401) {
-                return true;
+            if ($statusCode == 400) {
+                return false;
             }
             if ($statusCode == 403) {
                 return call_user_func($this->backoffCallback403, $response);
-            }
-            if ($statusCode == 429) {
-                return true;
-            }
-            if ($statusCode >= 500 && $statusCode < 600) {
-                return true;
             }
         }
         return true;
