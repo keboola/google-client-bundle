@@ -9,12 +9,10 @@
          processIsolation="false"
          stopOnFailure="false"
          bootstrap="vendor/autoload.php">
-	<php>
-		<server name="KERNEL_DIR" value="vendor/syrup/development-bundle/app/" />
-	</php>
+
     <testsuites>
         <testsuite name="Keboola Google Client Bundle">
-            <directory>Tests</directory>
+            <directory>tests</directory>
         </testsuite>
     </testsuites>
 </phpunit>
