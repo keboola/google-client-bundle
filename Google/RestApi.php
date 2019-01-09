@@ -289,7 +289,7 @@ class RestApi
         return $this->getClient()->$method($url, $options);
     }
 
-    protected function logRetryRequest($retries, RequestInterface $request, ResponseInterface $response)
+    protected function logRetryRequest($retries, RequestInterface $request, ResponseInterface $response = null)
     {
         if ($this->logger !== null) {
             $headersForLog = array_map(function ($item, $key) {
@@ -298,23 +298,29 @@ class RestApi
                 }
                 return $item;
             }, $request->getHeaders(), array_keys($request->getHeaders()));
-            $this->logger->info(sprintf("Retrying request (%sx)", $retries), [
+
+            $context = [
                 'request' => [
                     'uri' => $request->getUri()->__toString(),
                     'headers' => $headersForLog,
                     'method' => $request->getMethod(),
                     'body' => $request->getBody()->getContents()
                 ],
-                'response' => [
+            ];
+
+            if ($response) {
+                $context['response'] = [
                     'statusCode' => $response->getStatusCode(),
                     'reason' => $response->getReasonPhrase(),
                     'body' => $response->getBody()->getContents()
-                ],
-            ]);
+                ];
+            }
+
+            $this->logger->info(sprintf("Retrying request (%sx)", $retries), $context);
         }
     }
 
-    protected function decideRetry($retries, $maxRetries, ResponseInterface $response)
+    protected function decideRetry($retries, $maxRetries, ResponseInterface $response = null)
     {
         if ($response) {
             if ($retries >= $maxRetries) {
