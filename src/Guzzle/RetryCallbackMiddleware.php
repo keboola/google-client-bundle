@@ -25,7 +25,7 @@ class RetryCallbackMiddleware
     /** @var callable */
     private $callback;
 
-    /** @var callable|string */
+    /** @var callable */
     private $delay;
 
     /**
@@ -50,9 +50,21 @@ class RetryCallbackMiddleware
         $this->decider = $decider;
         $this->callback = $callback;
         $this->nextHandler = $nextHandler;
-        $this->delay = $delay ?: __CLASS__ . '::exponentialDelay';
+        $this->delay = $delay ?: static::getExponentialDelayFn();
     }
 
+    public static function getExponentialDelayFn(): callable
+    {
+        return function (int $retries): int {
+            return (int) (1000 * pow(2, $retries - 1) + rand(0, 500));
+        };
+    }
+
+    /**
+     * @deprecated - use getExponentialDelayFn() instead
+     * @param int $retries
+     * @return int
+     */
     public static function exponentialDelay(int $retries): int
     {
         return (int) (1000 * pow(2, $retries - 1) + rand(0, 500));
