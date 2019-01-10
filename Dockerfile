@@ -12,7 +12,18 @@ COPY docker/composer-install.sh /tmp/composer-install.sh
 
 # Deps
 RUN apt-get update
-RUN apt-get install -y  --no-install-recommends wget curl make git bzip2 time libzip-dev zip unzip openssl vim
+RUN apt-get install -y  --no-install-recommends \
+    wget \
+    curl \
+    make \
+    git \
+    bzip2 \
+    time \
+    libzip-dev \
+    zip \
+    unzip \
+    openssl \
+    vim
 
 # PHP
 RUN docker-php-ext-install sockets
@@ -23,5 +34,3 @@ RUN chmod +x /tmp/composer-install.sh && /tmp/composer-install.sh
 # Main
 ADD . /code
 RUN composer install $COMPOSER_FLAGS
-
-CMD ["composer", "ci"]

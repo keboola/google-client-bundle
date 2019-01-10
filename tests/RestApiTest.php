@@ -25,9 +25,9 @@ class RestApiTest extends TestCase
 
     protected function initApi(): RestApi
     {
-        $this->clientId = getenv('CLIENT_ID');
-        $this->clientSecret = getenv('CLIENT_SECRET');
-        $this->refreshToken = getenv('REFRESH_TOKEN');
+        $this->clientId = $this->getEnv('CLIENT_ID');
+        $this->clientSecret = $this->getEnv('CLIENT_SECRET');
+        $this->refreshToken = $this->getEnv('REFRESH_TOKEN');
         $this->logger = new Logger('Google Rest API tests');
 
         return new RestApi(
@@ -98,4 +98,16 @@ class RestApiTest extends TestCase
         $this->assertArrayHasKey('name', $body);
         $this->assertGreaterThan(5, $time);
     }
+
+    protected function getEnv(string $name): string
+    {
+        $value = getenv($name);
+
+        if ($value === false) {
+            throw new \Exception(sprintf('Environment variable "%s" cannot be empty', $name));
+        }
+
+        return $value;
+    }
+
 }
