@@ -60,11 +60,9 @@ class RetryCallbackMiddleware
         };
     }
 
-    /**
-     * @deprecated - use getExponentialDelayFn() instead
-     * @param int $retries
-     * @return int
-     */
+    // phpcs:disable SlevomatCodingStandard.TypeHints.TypeHintDeclaration.UselessDocComment
+    /** @deprecated - use getExponentialDelayFn() instead */
+    // phpcs:enable SlevomatCodingStandard.TypeHints.TypeHintDeclaration.UselessDocComment
     public static function exponentialDelay(int $retries): int
     {
         return (int) (1000 * pow(2, $retries - 1) + rand(0, 500));

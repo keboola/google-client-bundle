@@ -109,5 +109,4 @@ class RestApiTest extends TestCase
 
         return $value;
     }
-
 }
