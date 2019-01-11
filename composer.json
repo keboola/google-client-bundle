@@ -1,7 +1,7 @@
 {
 	"name": "keboola/google-client-bundle",
-	"type": "symfony-bundle",
 	"description": "Keboola Google API Client",
+	"license": "MIT",
 	"keywords": ["keboola", "google", "rest", "client"],
 	"authors": [
 		{
@@ -10,16 +10,37 @@
 		}
 	],
 	"require": {
-		"php": ">=5.4.0",
+		"php": "^7.1",
 		"guzzlehttp/guzzle": "^6.0",
 		"monolog/monolog": "^1.23"
 	},
 	"require-dev": {
-	  	"phpunit/phpunit": "3.7.*"
+		"phpunit/phpunit": "^7.5",
+		"jakub-onderka/php-parallel-lint": "^1.0",
+		"keboola/coding-standard": "^7.0",
+		"phpstan/phpstan-shim": "^0.10.8"
 	},
 	"minimum-stability": "stable",
 	"autoload": {
-		"psr-0": { "Keboola\\Google\\ClientBundle": "" }
+		"psr-4": {
+			"Keboola\\Google\\ClientBundle\\": "src/",
+			"Keboola\\Google\\ClientBundle\\Tests\\": "tests/"
+		}
 	},
-	"target-dir": "Keboola/Google/ClientBundle"
+	"scripts": {
+		"tests": "phpunit",
+		"phpstan": "phpstan analyse ./src ./tests --level=max --no-progress -c phpstan.neon",
+		"phpcs": "phpcs -n --ignore=vendor --extensions=php .",
+		"phplint": "parallel-lint -j 10 --exclude vendor .",
+		"check": [
+			"@phplint",
+			"@phpcs",
+			"@phpstan"
+		],
+		"ci": [
+			"@composer validate --no-check-all --strict",
+			"@check",
+			"@tests"
+		]
+	}
 }

@@ -1,42 +1,45 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: miroslavcillik
- * Date: 29/10/15
- * Time: 17:06
- */
 
-namespace Keboola\Google\ClientBundle\Google;
+declare(strict_types=1);
 
+namespace Keboola\Google\ClientBundle\Tests;
+
+use Keboola\Google\ClientBundle\Google\RestApi;
 use Monolog\Logger;
+use PHPUnit\Framework\TestCase;
+use SebastianBergmann\Timer\Timer;
 
-class RestApiTest extends \PHPUnit_Framework_TestCase
+class RestApiTest extends TestCase
 {
+    /** @var string */
     private $clientId;
 
+    /** @var string */
     private $clientSecret;
 
+    /** @var string */
     private $refreshToken;
 
+    /** @var Logger */
     private $logger;
 
-    protected function initApi()
+    protected function initApi(): RestApi
     {
-        $this->clientId = getenv('CLIENT_ID');
-        $this->clientSecret = getenv('CLIENT_SECRET');
-        $this->refreshToken = getenv('REFRESH_TOKEN');
+        $this->clientId = $this->getEnv('CLIENT_ID');
+        $this->clientSecret = $this->getEnv('CLIENT_SECRET');
+        $this->refreshToken = $this->getEnv('REFRESH_TOKEN');
         $this->logger = new Logger('Google Rest API tests');
 
         return new RestApi(
             $this->clientId,
             $this->clientSecret,
-            null,
+            '',
             $this->refreshToken,
             $this->logger
         );
     }
 
-    public function testGetAuthorizationUrl()
+    public function testGetAuthorizationUrl(): void
     {
         $restApi = $this->initApi();
         $url = $restApi->getAuthorizationUrl('www.something.com', 'email', 'force', 'offline', 'state');
@@ -52,28 +55,29 @@ class RestApiTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals($expectedUrl, $url);
     }
 
-    public function testRefreshToken()
+    public function testRefreshToken(): void
     {
         $restApi = $this->initApi();
         $response = $restApi->refreshToken();
 
         $this->assertArrayHasKey('access_token', $response);
+        $this->assertNotEmpty($response['access_token']);
     }
 
-    public function testRequest()
+    public function testRequest(): void
     {
         $restApi = $this->initApi();
         $response = $restApi->request('/oauth2/v3/userinfo');
-        $body = json_decode($response->getBody(), true);
+        $body = json_decode($response->getBody()->getContents(), true);
 
         $this->assertArrayHasKey('sub', $body);
         $this->assertArrayHasKey('email', $body);
         $this->assertArrayHasKey('name', $body);
     }
 
-    public function testDelayFn()
+    public function testDelayFn(): void
     {
-        \PHP_Timer::start();
+        Timer::start();
 
         $delayFn = function ($retries) {
             return (int) (5000 * pow(2, $retries - 1) + rand(0, 500));
@@ -84,14 +88,25 @@ class RestApiTest extends \PHPUnit_Framework_TestCase
 
         $response = $restApi->request('/oauth2/v3/userinfo');
 
-        \PHP_Timer::stop();
-        $time = \PHP_Timer::timeSinceStartOfRequest();
+        Timer::stop();
+        $time = Timer::timeSinceStartOfRequest();
 
-        $body = json_decode($response->getBody(), true);
+        $body = json_decode($response->getBody()->getContents(), true);
 
         $this->assertArrayHasKey('sub', $body);
         $this->assertArrayHasKey('email', $body);
         $this->assertArrayHasKey('name', $body);
         $this->assertGreaterThan(5, $time);
+    }
+
+    protected function getEnv(string $name): string
+    {
+        $value = getenv($name);
+
+        if ($value === false) {
+            throw new \Exception(sprintf('Environment variable "%s" cannot be empty', $name));
+        }
+
+        return $value;
     }
 }

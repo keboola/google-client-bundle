@@ -1,0 +1,23 @@
+version: "2"
+services:
+  tests:
+    build: .
+    image: keboola/google-client-bundle
+    working_dir: /code
+    command: composer ci
+    environment:
+      - CLIENT_ID
+      - CLIENT_SECRET
+      - REFRESH_TOKEN
+
+  dev:
+    build: .
+    image: keboola/google-client-bundle
+    volumes:
+      - .:/code
+    working_dir: /code
+    command: composer ci
+    environment:
+      - CLIENT_ID
+      - CLIENT_SECRET
+      - REFRESH_TOKEN

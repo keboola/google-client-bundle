@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Keboola\Google\ClientBundle\Guzzle;
 
 use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\Promise\RejectedPromise;
 use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * Middleware that retries requests based on the boolean result of
@@ -42,33 +45,30 @@ class RetryCallbackMiddleware
         callable $decider,
         callable $callback,
         callable $nextHandler,
-        callable $delay = null
+        ?callable $delay = null
     ) {
         $this->decider = $decider;
         $this->callback = $callback;
         $this->nextHandler = $nextHandler;
-        $this->delay = $delay ?: __CLASS__ . '::exponentialDelay';
+        $this->delay = $delay ?: static::getExponentialDelayFn();
     }
 
-    /**
-     * Default exponential backoff delay function.
-     *
-     * @param $retries
-     *
-     * @return int
-     */
-    public static function exponentialDelay($retries)
+    public static function getExponentialDelayFn(): callable
+    {
+        return function (int $retries): int {
+            return (int) (1000 * pow(2, $retries - 1) + rand(0, 500));
+        };
+    }
+
+    // phpcs:disable SlevomatCodingStandard.TypeHints.TypeHintDeclaration.UselessDocComment
+    /** @deprecated - use getExponentialDelayFn() instead */
+    // phpcs:enable SlevomatCodingStandard.TypeHints.TypeHintDeclaration.UselessDocComment
+    public static function exponentialDelay(int $retries): int
     {
         return (int) (1000 * pow(2, $retries - 1) + rand(0, 500));
     }
 
-    /**
-     * @param RequestInterface $request
-     * @param array            $options
-     *
-     * @return PromiseInterface
-     */
-    public function __invoke(RequestInterface $request, array $options)
+    public function __invoke(RequestInterface $request, array $options): PromiseInterface
     {
         if (!isset($options['retries'])) {
             $options['retries'] = 0;
@@ -82,26 +82,26 @@ class RetryCallbackMiddleware
             );
     }
 
-    private function onFulfilled(RequestInterface $req, array $options)
+    private function onFulfilled(RequestInterface $request, array $options): callable
     {
-        return function ($value) use ($req, $options) {
+        return function (ResponseInterface $response) use ($request, $options) {
             if (!call_user_func(
                 $this->decider,
                 $options['retries'],
-                $req,
-                $value,
+                $request,
+                $response,
                 null
             )) {
-                return $value;
+                return $response;
             }
 
             // call callback
             $fn = $this->callback;
-            return $this->doRetry($fn($req, $value), $options);
+            return $this->doRetry($fn($request, $response), $options);
         };
     }
 
-    private function onRejected(RequestInterface $req, array $options)
+    private function onRejected(RequestInterface $req, array $options): callable
     {
         return function ($reason) use ($req, $options) {
             if (!call_user_func(
@@ -117,11 +117,10 @@ class RetryCallbackMiddleware
         };
     }
 
-    private function doRetry(RequestInterface $request, array $options)
+    private function doRetry(RequestInterface $request, array $options): PromiseInterface
     {
         $options['delay'] = call_user_func($this->delay, ++$options['retries']);
 
         return $this($request, $options);
     }
-
 }

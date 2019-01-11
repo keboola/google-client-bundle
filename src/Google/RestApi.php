@@ -1,10 +1,6 @@
 <?php
-/**
- * RestApi.php
- *
- * @author: Miroslav Čillík <miro@keboola.com>
- * @created: 21.6.13
- */
+
+declare(strict_types=1);
 
 namespace Keboola\Google\ClientBundle\Google;
 
@@ -20,32 +16,42 @@ use Psr\Http\Message\ResponseInterface;
 
 class RestApi
 {
+    public const API_URI = 'https://www.googleapis.com';
+    public const OAUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 
-    const API_URI = 'https://www.googleapis.com';
-    const OAUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-
+    /** @var int */
     protected $maxBackoffs = 7;
+
+    /** @var callable */
     protected $backoffCallback403;
 
+    /** @var string */
     protected $accessToken;
+
+    /** @var string */
     protected $refreshToken;
+
+    /** @var string */
     protected $clientId;
+
+    /** @var string */
     protected $clientSecret;
 
+    /** @var callable */
     protected $refreshTokenCallback;
 
     /** @var callable */
     protected $delayFn = null;
 
-    /** @var Logger */
+    /** @var ?Logger */
     protected $logger;
 
     public function __construct(
-        $clientId,
-        $clientSecret,
-        $accessToken = null,
-        $refreshToken = null,
-        $logger = null
+        string $clientId,
+        string $clientSecret,
+        string $accessToken = '',
+        string $refreshToken = '',
+        ?Logger $logger = null
     ) {
         $this->clientId = $clientId;
         $this->clientSecret = $clientSecret;
@@ -57,20 +63,22 @@ class RestApi
         };
     }
 
-    public static function createRetryMiddleware(callable $decider, callable $callback, callable $delay = null)
-    {
+    public static function createRetryMiddleware(
+        callable $decider,
+        callable $callback,
+        ?callable $delay = null
+    ): callable {
         return function (callable $handler) use ($decider, $callback, $delay) {
             return new RetryCallbackMiddleware($decider, $callback, $handler, $delay);
         };
     }
 
-    public function createRetryDecider($maxRetries = 5)
+    public function createRetryDecider(int $maxRetries = 5): callable
     {
         return function (
             $retries,
             RequestInterface $request,
-            ResponseInterface $response = null,
-            $error = null
+            ?ResponseInterface $response = null
         ) use ($maxRetries) {
             $decision = $this->decideRetry($retries, $maxRetries, $response);
             if ($decision) {
@@ -81,15 +89,15 @@ class RestApi
         };
     }
 
-    public function createRetryCallback()
+    public function createRetryCallback(): callable
     {
         $api = $this;
 
         return function (
             RequestInterface $request,
-            ResponseInterface $response = null
+            ?ResponseInterface $response = null
         ) use ($api) {
-            if ($response->getStatusCode() == 401) {
+            if ($response && $response->getStatusCode() === 401) {
                 $tokens = $api->refreshToken();
                 return $request->withHeader('Authorization', 'Bearer ' . $tokens['access_token']);
             }
@@ -97,7 +105,7 @@ class RestApi
         };
     }
 
-    protected function getClient($baseUri = self::API_URI)
+    protected function getClient(string $baseUri = self::API_URI): Client
     {
         $handlerStack = HandlerStack::create(new CurlHandler());
 
@@ -109,76 +117,67 @@ class RestApi
 
         return new Client([
             'base_uri' => $baseUri,
-            'handler' => $handlerStack
+            'handler' => $handlerStack,
         ]);
     }
 
-    public function setDelayFn(callable $delayFn)
+    public function setDelayFn(callable $delayFn): void
     {
         $this->delayFn = $delayFn;
     }
 
-    public function setBackoffsCount($cnt)
+    public function setBackoffsCount(int $cnt): void
     {
         $this->maxBackoffs = $cnt;
     }
 
-    /**
-     * Set decider function which will decide whether to retry or not on 403 response code
-     * @param callable $function
-     */
-    public function setBackoffCallback403(callable $function)
+    public function setBackoffCallback403(callable $function): void
     {
         $this->backoffCallback403 = $function;
     }
 
-    public function setCredentials($accessToken, $refreshToken)
+    public function setCredentials(string $accessToken, string $refreshToken): void
     {
         $this->accessToken = $accessToken;
         $this->refreshToken = $refreshToken;
     }
 
-    public function getAccessToken()
+    public function getAccessToken(): string
     {
         return $this->accessToken;
     }
 
-    public function getRefreshToken()
+    public function getRefreshToken(): array
     {
         return $this->refreshToken();
     }
 
-    public function setRefreshTokenCallback($callback)
+    public function setRefreshTokenCallback(callable $callback): void
     {
         $this->refreshTokenCallback = $callback;
     }
 
-    public function setAppCredentials($clientId, $clientSecret)
+    public function setAppCredentials(string $clientId, string $clientSecret): void
     {
         $this->clientId = $clientId;
         $this->clientSecret = $clientSecret;
     }
 
-    /**
-     * Obtains authorization code by user login into Google and approve app
-     *
-     * @param $redirectUri
-     * @param $scope
-     * @param string $approvalPrompt
-     * @param string $accessType
-     * @param string $state
-     * @return string
-     */
-    public function getAuthorizationUrl($redirectUri, $scope, $approvalPrompt = 'force', $accessType = 'offline', $state = '')
-    {
-        $params = array(
+    public function getAuthorizationUrl(
+        string $redirectUri,
+        string $scope,
+        string $approvalPrompt = 'force',
+        string $accessType = 'offline',
+        string $state = ''
+    ): string {
+        $params = [
             'response_type=code',
             'redirect_uri=' . urlencode($redirectUri),
             'client_id=' . urlencode($this->clientId),
             'scope=' . urlencode($scope),
             'access_type=' . urlencode($accessType),
-            'approval_prompt=' . urlencode($approvalPrompt)
-        );
+            'approval_prompt=' . urlencode($approvalPrompt),
+        ];
 
         if ($state) {
             $params[] = 'state=' . urlencode($state);
@@ -189,29 +188,21 @@ class RestApi
         return self::OAUTH_URL . "?$params";
     }
 
-    /**
-     * Get OAuth 2.0 Access Token
-     *
-     * @param String $code - authorization code
-     * @param $redirectUri
-     * @throws \GuzzleHttp\Exception\GuzzleException
-     * @return array accessToken, refreshTokenp
-     */
-    public function authorize($code, $redirectUri)
+    public function authorize(string $code, string $redirectUri): array
     {
         $client = $this->getClient();
 
         $response = $client->request('post', '/oauth2/v4/token', [
             'headers' => [
-                'Content-Type' => 'application/x-www-form-urlencoded'
+                'Content-Type' => 'application/x-www-form-urlencoded',
             ],
             'form_params' => [
                 'code' => $code,
                 'client_id' => $this->clientId,
                 'client_secret' => $this->clientSecret,
                 'redirect_uri' => $redirectUri,
-                'grant_type' => 'authorization_code'
-            ]
+                'grant_type' => 'authorization_code',
+            ],
         ]);
 
         $responseBody = json_decode($response->getBody(), true);
@@ -222,66 +213,58 @@ class RestApi
         return $responseBody;
     }
 
-    public function refreshToken()
+    public function refreshToken(): array
     {
         $client = new Client(['base_uri' => self::API_URI]);
 
         $response = $client->request('post', '/oauth2/v4/token', [
             'headers' => [
-                'Content-Type' => 'application/x-www-form-urlencoded'
+                'Content-Type' => 'application/x-www-form-urlencoded',
             ],
             'form_params' => [
                 'refresh_token' => $this->refreshToken,
                 'client_id' => $this->clientId,
                 'client_secret' => $this->clientSecret,
-                'grant_type' => 'refresh_token'
-            ]
+                'grant_type' => 'refresh_token',
+            ],
         ]);
 
-        $responseBody = json_decode($response->getBody(), true);
+        $responseBody = json_decode($response->getBody()->getContents(), true);
 
         $this->accessToken = $responseBody['access_token'];
         if (isset($responseBody['refresh_token'])) {
             $this->refreshToken = $responseBody['refresh_token'];
         }
 
-        if ($this->refreshTokenCallback != null) {
+        if ($this->refreshTokenCallback !== null) {
             call_user_func($this->refreshTokenCallback, $this->accessToken, $this->refreshToken);
         }
 
         return $responseBody;
     }
 
-    /**
-     * Call Google REST API
-     *
-     * @param $url
-     * @param string $method
-     * @param array $addHeaders
-     * @param $options
-     * @return Response
-     * @throws RestApiException
-     */
-    public function request($url, $method = 'GET', $addHeaders = [], $options = [])
-    {
+    public function request(
+        string $url,
+        string $method = 'GET',
+        array $addHeaders = [],
+        array $options = []
+    ): Response {
         $method = strtolower($method);
         if (!in_array($method, ['get', 'head', 'post', 'put', 'patch', 'delete', 'options'])) {
             throw new RestApiException("Wrong http method specified", 500);
         }
 
-        if (null == $this->refreshToken) {
+        if (null === $this->refreshToken) {
             throw new RestApiException("Refresh token must be set", 400);
         }
 
         $headers = [
             'Accept' => 'application/json',
-            'Authorization' => 'Bearer ' . $this->accessToken
+            'Authorization' => 'Bearer ' . $this->accessToken,
         ];
 
-        if (null != $addHeaders && is_array($addHeaders)) {
-            foreach ($addHeaders as $k => $v) {
-                $headers[$k] = $v;
-            }
+        foreach ($addHeaders as $k => $v) {
+            $headers[$k] = $v;
         }
 
         $options['headers'] = $headers;
@@ -289,8 +272,11 @@ class RestApi
         return $this->getClient()->$method($url, $options);
     }
 
-    protected function logRetryRequest($retries, RequestInterface $request, ResponseInterface $response = null)
-    {
+    protected function logRetryRequest(
+        int $retries,
+        RequestInterface $request,
+        ?ResponseInterface $response = null
+    ): void {
         if ($this->logger !== null) {
             $headersForLog = array_map(function ($item, $key) {
                 if (strtolower($key) === 'authorization') {
@@ -304,7 +290,7 @@ class RestApi
                     'uri' => $request->getUri()->__toString(),
                     'headers' => $headersForLog,
                     'method' => $request->getMethod(),
-                    'body' => $request->getBody()->getContents()
+                    'body' => $request->getBody()->getContents(),
                 ],
             ];
 
@@ -312,7 +298,7 @@ class RestApi
                 $context['response'] = [
                     'statusCode' => $response->getStatusCode(),
                     'reason' => $response->getReasonPhrase(),
-                    'body' => $response->getBody()->getContents()
+                    'body' => $response->getBody()->getContents(),
                 ];
             }
 
@@ -320,7 +306,7 @@ class RestApi
         }
     }
 
-    protected function decideRetry($retries, $maxRetries, ResponseInterface $response = null)
+    protected function decideRetry(int $retries, int $maxRetries, ?ResponseInterface $response = null): bool
     {
         if ($response) {
             if ($retries >= $maxRetries) {
@@ -330,14 +316,13 @@ class RestApi
             if ($statusCode >= 200 && $statusCode < 300) {
                 return false;
             }
-            if ($statusCode == 400) {
+            if ($statusCode === 400) {
                 return false;
             }
-            if ($statusCode == 403) {
+            if ($statusCode === 403) {
                 return call_user_func($this->backoffCallback403, $response);
             }
         }
         return true;
     }
 }
-
