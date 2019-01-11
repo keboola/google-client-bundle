@@ -22,11 +22,7 @@ RUN apt-get install -y  --no-install-recommends \
     libzip-dev \
     zip \
     unzip \
-    openssl \
-    vim
-
-# PHP
-RUN docker-php-ext-install sockets
+    openssl
 
 # Composer
 RUN chmod +x /tmp/composer-install.sh && /tmp/composer-install.sh
