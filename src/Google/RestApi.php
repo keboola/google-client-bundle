@@ -302,7 +302,7 @@ class RestApi
                 ];
             }
 
-            $this->logger->info(sprintf("Retrying request (%sx)", $retries), $context);
+            $this->logger->warning(sprintf("Retrying request (%sx)", $retries), $context);
         }
     }
 
