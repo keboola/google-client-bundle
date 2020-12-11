@@ -205,7 +205,7 @@ class RestApi
             ],
         ]);
 
-        $responseBody = json_decode($response->getBody(), true);
+        $responseBody = json_decode((string) $response->getBody(), true);
 
         $this->accessToken = $responseBody['access_token'];
         $this->refreshToken = $responseBody['refresh_token'];
@@ -251,11 +251,11 @@ class RestApi
     ): Response {
         $method = strtolower($method);
         if (!in_array($method, ['get', 'head', 'post', 'put', 'patch', 'delete', 'options'])) {
-            throw new RestApiException("Wrong http method specified", 500);
+            throw new RestApiException('Wrong http method specified', 500);
         }
 
-        if (null === $this->refreshToken) {
-            throw new RestApiException("Refresh token must be set", 400);
+        if ($this->refreshToken === null) {
+            throw new RestApiException('Refresh token must be set', 400);
         }
 
         $headers = [
@@ -302,7 +302,7 @@ class RestApi
                 ];
             }
 
-            $this->logger->warning(sprintf("Retrying request (%sx)", $retries), $context);
+            $this->logger->warning(sprintf('Retrying request (%sx)', $retries), $context);
         }
     }
 
