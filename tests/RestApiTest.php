@@ -77,7 +77,8 @@ class RestApiTest extends TestCase
 
     public function testDelayFn(): void
     {
-        Timer::start();
+        $timer = new Timer();
+        $timer->start();
 
         $delayFn = function ($retries) {
             return (int) (5000 * pow(2, $retries - 1) + rand(0, 500));
@@ -88,8 +89,7 @@ class RestApiTest extends TestCase
 
         $response = $restApi->request('/oauth2/v3/userinfo');
 
-        Timer::stop();
-        $time = Timer::timeSinceStartOfRequest();
+        $time = $timer->stop()->asSeconds();
 
         $body = json_decode($response->getBody()->getContents(), true);
 
