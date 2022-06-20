@@ -278,12 +278,10 @@ class RestApi
         ?ResponseInterface $response = null
     ): void {
         if ($this->logger !== null) {
-            $headersForLog = array_map(function ($item, $key) {
-                if (strtolower($key) === 'authorization') {
-                    return '*****';
-                }
-                return $item;
-            }, $request->getHeaders(), array_keys($request->getHeaders()));
+            $headersForLog = $request->getHeaders();
+            if (array_key_exists('Authorization', $headersForLog)) {
+                $headersForLog['Authorization'] = '*****';
+            }
 
             $context = [
                 'request' => [
