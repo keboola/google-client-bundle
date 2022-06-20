@@ -119,6 +119,34 @@ class RestApiTest extends TestCase
         foreach ($this->testHandler->getRecords() as $key => $value) {
             $this->assertEquals(Logger::INFO, $value['level']);
             $this->assertEquals(sprintf('Retrying request (%dx)', $key), $value['message']);
+            $this->assertEquals(
+                [
+                    'request' => [
+                        'uri' => 'https://www.googleapis.com/auth/invalid-scope',
+                        'headers' => [
+                            'User-Agent' => ['GuzzleHttp/6.5.5 curl/7.74.0 PHP/7.4.30'],
+                            'Host' => ['www.googleapis.com'],
+                            'Accept' => ['application/json'],
+                            'Authorization' => '*****',
+
+                        ],
+                        'method' => 'GET',
+                        'body' => '',
+                    ],
+                    'response' => [
+                        'statusCode' => 404,
+                        'reason' => 'Not Found',
+                        'body' => 'You are receiving this error either because your input OAuth2 scope name is ' .
+                            "invalid or it refers to a newer scope that is outside the domain of this legacy API.\n\n" .
+                            'This API was built at a time when the scope name format was not yet standardized. This ' .
+                            'is no longer the case and all valid scope names (both old and new) are catalogued at ' .
+                            'https://developers.google.com/identity/protocols/oauth2/scopes. Use that webpage to' .
+                            ' lookup (manually) the scope name associated with the API you are trying to call and use' .
+                            " it to craft your OAuth2 request.\n",
+                    ],
+                ],
+                $value['context']
+            );
         }
     }
 
