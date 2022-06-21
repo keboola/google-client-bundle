@@ -298,9 +298,14 @@ class RestApi
                     'reason' => $response->getReasonPhrase(),
                     'body' => $response->getBody()->getContents(),
                 ];
-            }
 
-            $this->logger->info(sprintf('Retrying request (%sx)', $retries), $context);
+                $this->logger->info(
+                    sprintf('Retrying request (%sx) - reason: %s', $retries, $response->getReasonPhrase()),
+                    $context
+                );
+            } else {
+                $this->logger->info(sprintf('Retrying request (%sx)', $retries), $context);
+            }
         }
     }
 

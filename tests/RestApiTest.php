@@ -118,7 +118,7 @@ class RestApiTest extends TestCase
 
         foreach ($this->testHandler->getRecords() as $key => $value) {
             $this->assertEquals(Logger::INFO, $value['level']);
-            $this->assertEquals(sprintf('Retrying request (%dx)', $key), $value['message']);
+            $this->assertEquals(sprintf('Retrying request (%dx) - reason: Not Found', $key), $value['message']);
             $this->assertEquals(
                 [
                     'request' => [
