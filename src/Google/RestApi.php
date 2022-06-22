@@ -279,7 +279,7 @@ class RestApi
     ): void {
         if ($this->logger !== null) {
             $headersForLog = $request->getHeaders();
-            if (array_key_exists('Authorization', $headersForLog)) {
+            if (array_key_exists('authorization', array_change_key_case($headersForLog, CASE_LOWER))) {
                 $headersForLog['Authorization'] = '*****';
             }
 
