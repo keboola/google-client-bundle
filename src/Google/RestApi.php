@@ -278,12 +278,10 @@ class RestApi
         ?ResponseInterface $response = null
     ): void {
         if ($this->logger !== null) {
-            $headersForLog = array_map(function ($item, $key) {
-                if (strtolower($key) === 'authorization') {
-                    return '*****';
-                }
-                return $item;
-            }, $request->getHeaders(), array_keys($request->getHeaders()));
+            $headersForLog = $request->getHeaders();
+            if (array_key_exists('authorization', array_change_key_case($headersForLog, CASE_LOWER))) {
+                $headersForLog['Authorization'] = '*****';
+            }
 
             $context = [
                 'request' => [
@@ -300,9 +298,14 @@ class RestApi
                     'reason' => $response->getReasonPhrase(),
                     'body' => $response->getBody()->getContents(),
                 ];
-            }
 
-            $this->logger->info(sprintf('Retrying request (%sx)', $retries), $context);
+                $this->logger->info(
+                    sprintf('Retrying request (%sx) - reason: %s', $retries, $response->getReasonPhrase()),
+                    $context
+                );
+            } else {
+                $this->logger->info(sprintf('Retrying request (%sx)', $retries), $context);
+            }
         }
     }
 
