@@ -170,7 +170,6 @@ class RestApiTest extends TestCase
         }
 
         $this->assertEmpty($testHandler->getRecords());
-
     }
 
     protected function getEnv(string $name): string
