@@ -164,12 +164,16 @@ class RestApiTest extends TestCase
         );
 
         try {
-            $api->refreshToken();
+            $api->request('/oauth2/v3/userinfo');
         } catch (ClientException $e) {
             $this->assertStringContainsString('401 Unauthorized', $e->getMessage());
         }
 
-        $this->assertEmpty($testHandler->getRecords());
+        $this->assertCount(1, $testHandler->getRecords());
+        $this->assertStringContainsString(
+            'Retrying request (0x) - reason: Unauthorized',
+            $testHandler->getRecords()[0]['message']
+        );
     }
 
     protected function getEnv(string $name): string
