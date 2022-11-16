@@ -319,7 +319,7 @@ class RestApi
             if ($statusCode >= 200 && $statusCode < 300) {
                 return false;
             }
-            if ($statusCode === 400) {
+            if ($statusCode === 400 || $statusCode === 401) {
                 return false;
             }
             if ($statusCode === 403) {

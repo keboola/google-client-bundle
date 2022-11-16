@@ -150,6 +150,29 @@ class RestApiTest extends TestCase
         }
     }
 
+    public function testDoNotRetryOnWrongCredentials(): void
+    {
+        $testHandler = new TestHandler();
+        $logger = new Logger('Google Rest API tests');
+        $logger->pushHandler($testHandler);
+        $api = new RestApi(
+            $this->getEnv('CLIENT_ID'),
+            $this->getEnv('CLIENT_SECRET') . 'invalid',
+            '',
+            $this->getEnv('REFRESH_TOKEN'),
+            $logger
+        );
+
+        try {
+            $api->refreshToken();
+        } catch (ClientException $e) {
+            $this->assertStringContainsString('401 Unauthorized', $e->getMessage());
+        }
+
+        $this->assertEmpty($testHandler->getRecords());
+
+    }
+
     protected function getEnv(string $name): string
     {
         $value = getenv($name);
