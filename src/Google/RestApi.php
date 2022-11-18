@@ -322,6 +322,9 @@ class RestApi
             if ($statusCode === 400) {
                 return false;
             }
+            if ($statusCode === 401 && $retries > 0) { //allow only one retry for refreshing token
+                return false;
+            }
             if ($statusCode === 403) {
                 return call_user_func($this->backoffCallback403, $response);
             }

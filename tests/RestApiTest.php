@@ -124,7 +124,7 @@ class RestApiTest extends TestCase
                     'request' => [
                         'uri' => 'https://www.googleapis.com/auth/invalid-scope',
                         'headers' => [
-                            'User-Agent' => ['GuzzleHttp/6.5.5 curl/7.74.0 PHP/7.4.30'],
+                            'User-Agent' => ['GuzzleHttp/6.5.5 curl/7.74.0 PHP/7.4.33'],
                             'Host' => ['www.googleapis.com'],
                             'Accept' => ['application/json'],
                             'Authorization' => '*****',
@@ -148,6 +148,32 @@ class RestApiTest extends TestCase
                 $value['context']
             );
         }
+    }
+
+    public function testDoNotRetryOnWrongCredentials(): void
+    {
+        $testHandler = new TestHandler();
+        $logger = new Logger('Google Rest API tests');
+        $logger->pushHandler($testHandler);
+        $api = new RestApi(
+            $this->getEnv('CLIENT_ID'),
+            $this->getEnv('CLIENT_SECRET') . 'invalid',
+            '',
+            $this->getEnv('REFRESH_TOKEN'),
+            $logger
+        );
+
+        try {
+            $api->request('/oauth2/v3/userinfo');
+        } catch (ClientException $e) {
+            $this->assertStringContainsString('401 Unauthorized', $e->getMessage());
+        }
+
+        $this->assertCount(1, $testHandler->getRecords());
+        $this->assertStringContainsString(
+            'Retrying request (0x) - reason: Unauthorized',
+            $testHandler->getRecords()[0]['message']
+        );
     }
 
     protected function getEnv(string $name): string
