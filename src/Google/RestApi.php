@@ -18,6 +18,8 @@ class RestApi
 {
     public const API_URI = 'https://www.googleapis.com';
     public const OAUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+    private const DEFAULT_CONNECT_TIMEOUT = 30;
+    private const DEFAULT_REQUEST_TIMEOUT = 5 * 60;
 
     /** @var int */
     protected $maxBackoffs = 7;
@@ -118,6 +120,8 @@ class RestApi
         return new Client([
             'base_uri' => $baseUri,
             'handler' => $handlerStack,
+            'connect_timeout' => self::DEFAULT_CONNECT_TIMEOUT,
+            'timeout' => self::DEFAULT_REQUEST_TIMEOUT,
         ]);
     }
 
