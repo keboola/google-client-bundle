@@ -324,6 +324,9 @@ class RestApi
                 return false;
             }
             if ($statusCode === 400) {
+                if (strpos((string) $response->getBody(), 'Unknown metric') !== false) {
+                    return true;
+                }
                 return false;
             }
             if ($statusCode === 401 && $retries > 0) { //allow only one retry for refreshing token
