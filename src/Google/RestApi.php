@@ -329,7 +329,8 @@ class RestApi
                 }
                 return false;
             }
-            if ($statusCode === 401 && $retries > 0) { //allow only one retry for refreshing token
+            //allow only one retry for refreshing token
+            if ($statusCode === 401 && $retries > 0 && $response->getReasonPhrase() !== 'Service Unavailable') {
                 return false;
             }
             if ($statusCode === 403) {
