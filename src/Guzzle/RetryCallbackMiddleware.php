@@ -45,7 +45,7 @@ class RetryCallbackMiddleware
         callable $decider,
         callable $callback,
         callable $nextHandler,
-        ?callable $delay = null
+        ?callable $delay = null,
     ) {
         $this->decider = $decider;
         $this->callback = $callback;
@@ -78,7 +78,7 @@ class RetryCallbackMiddleware
         return $fn($request, $options)
             ->then(
                 $this->onFulfilled($request, $options),
-                $this->onRejected($request, $options)
+                $this->onRejected($request, $options),
             );
     }
 
@@ -90,7 +90,7 @@ class RetryCallbackMiddleware
                 $options['retries'],
                 $request,
                 $response,
-                null
+                null,
             )) {
                 return $response;
             }
@@ -109,7 +109,7 @@ class RetryCallbackMiddleware
                 $options['retries'],
                 $req,
                 null,
-                $reason
+                $reason,
             )) {
                 return new RejectedPromise($reason);
             }

@@ -53,7 +53,7 @@ class RestApi
         string $clientSecret,
         string $accessToken = '',
         string $refreshToken = '',
-        ?Logger $logger = null
+        ?Logger $logger = null,
     ) {
         $this->clientId = $clientId;
         $this->clientSecret = $clientSecret;
@@ -68,7 +68,7 @@ class RestApi
     public static function createRetryMiddleware(
         callable $decider,
         callable $callback,
-        ?callable $delay = null
+        ?callable $delay = null,
     ): callable {
         return function (callable $handler) use ($decider, $callback, $delay) {
             return new RetryCallbackMiddleware($decider, $callback, $handler, $delay);
@@ -80,7 +80,7 @@ class RestApi
         return function (
             $retries,
             RequestInterface $request,
-            ?ResponseInterface $response = null
+            ?ResponseInterface $response = null,
         ) use ($maxRetries) {
             $decision = $this->decideRetry($retries, $maxRetries, $response);
             if ($decision) {
@@ -97,7 +97,7 @@ class RestApi
 
         return function (
             RequestInterface $request,
-            ?ResponseInterface $response = null
+            ?ResponseInterface $response = null,
         ) use ($api) {
             if ($response && $response->getStatusCode() === 401) {
                 $tokens = $api->refreshToken();
@@ -114,7 +114,7 @@ class RestApi
         $handlerStack->push(self::createRetryMiddleware(
             $this->createRetryDecider($this->maxBackoffs),
             $this->createRetryCallback(),
-            $this->delayFn
+            $this->delayFn,
         ));
 
         return new Client([
@@ -172,7 +172,7 @@ class RestApi
         string $scope,
         string $approvalPrompt = 'force',
         string $accessType = 'offline',
-        string $state = ''
+        string $state = '',
     ): string {
         $params = [
             'response_type=code',
@@ -209,6 +209,7 @@ class RestApi
             ],
         ]);
 
+        /** @var array<string, string> $responseBody */
         $responseBody = json_decode((string) $response->getBody(), true);
 
         $this->accessToken = $responseBody['access_token'];
@@ -233,6 +234,7 @@ class RestApi
             ],
         ]);
 
+        /** @var array<string, string> $responseBody */
         $responseBody = json_decode($response->getBody()->getContents(), true);
 
         $this->accessToken = $responseBody['access_token'];
@@ -251,7 +253,7 @@ class RestApi
         string $url,
         string $method = 'GET',
         array $addHeaders = [],
-        array $options = []
+        array $options = [],
     ): Response {
         $method = strtolower($method);
         if (!in_array($method, ['get', 'head', 'post', 'put', 'patch', 'delete', 'options'])) {
@@ -279,7 +281,7 @@ class RestApi
     protected function logRetryRequest(
         int $retries,
         RequestInterface $request,
-        ?ResponseInterface $response = null
+        ?ResponseInterface $response = null,
     ): void {
         if ($this->logger !== null) {
             $headersForLog = $request->getHeaders();
@@ -305,7 +307,7 @@ class RestApi
 
                 $this->logger->info(
                     sprintf('Retrying request (%sx) - reason: %s', $retries, $response->getReasonPhrase()),
-                    $context
+                    $context,
                 );
             } else {
                 $this->logger->info(sprintf('Retrying request (%sx)', $retries), $context);
