@@ -127,7 +127,7 @@ class RestApiTest extends TestCase
                     'request' => [
                         'uri' => 'https://www.googleapis.com/auth/invalid-scope',
                         'headers' => [
-                            'User-Agent' => ['GuzzleHttp/6.5.5 curl/7.88.1 PHP/8.1.24'],
+                            'User-Agent' => ['GuzzleHttp/7'],
                             'Host' => ['www.googleapis.com'],
                             'Accept' => ['application/json'],
                             'Authorization' => '*****',
