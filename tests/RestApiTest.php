@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Keboola\Google\ClientBundle\Tests;
 
+use Exception;
 use GuzzleHttp\Exception\ClientException;
 use Keboola\Google\ClientBundle\Google\RestApi;
 use Monolog\Handler\TestHandler;
@@ -42,7 +43,7 @@ class RestApiTest extends TestCase
             $this->clientSecret,
             '',
             $this->refreshToken,
-            $this->logger
+            $this->logger,
         );
     }
 
@@ -76,6 +77,7 @@ class RestApiTest extends TestCase
         $restApi = $this->initApi();
         $response = $restApi->request('/oauth2/v3/userinfo');
         $body = json_decode($response->getBody()->getContents(), true);
+        self::assertIsArray($body);
 
         $this->assertArrayHasKey('sub', $body);
         $this->assertArrayHasKey('email', $body);
@@ -99,6 +101,7 @@ class RestApiTest extends TestCase
         $time = $timer->stop()->asSeconds();
 
         $body = json_decode($response->getBody()->getContents(), true);
+        self::assertIsArray($body);
 
         $this->assertArrayHasKey('sub', $body);
         $this->assertArrayHasKey('email', $body);
@@ -124,7 +127,7 @@ class RestApiTest extends TestCase
                     'request' => [
                         'uri' => 'https://www.googleapis.com/auth/invalid-scope',
                         'headers' => [
-                            'User-Agent' => ['GuzzleHttp/6.5.5 curl/7.74.0 PHP/7.4.33'],
+                            'User-Agent' => ['GuzzleHttp/7'],
                             'Host' => ['www.googleapis.com'],
                             'Accept' => ['application/json'],
                             'Authorization' => '*****',
@@ -145,7 +148,7 @@ class RestApiTest extends TestCase
                             " it to craft your OAuth2 request.\n",
                     ],
                 ],
-                $value['context']
+                $value['context'],
             );
         }
     }
@@ -160,7 +163,7 @@ class RestApiTest extends TestCase
             $this->getEnv('CLIENT_SECRET') . 'invalid',
             '',
             $this->getEnv('REFRESH_TOKEN'),
-            $logger
+            $logger,
         );
 
         try {
@@ -172,7 +175,7 @@ class RestApiTest extends TestCase
         $this->assertCount(1, $testHandler->getRecords());
         $this->assertStringContainsString(
             'Retrying request (0x) - reason: Unauthorized',
-            $testHandler->getRecords()[0]['message']
+            $testHandler->getRecords()[0]['message'],
         );
     }
 
@@ -181,7 +184,7 @@ class RestApiTest extends TestCase
         $value = getenv($name);
 
         if ($value === false) {
-            throw new \Exception(sprintf('Environment variable "%s" cannot be empty', $name));
+            throw new Exception(sprintf('Environment variable "%s" cannot be empty', $name));
         }
 
         return $value;

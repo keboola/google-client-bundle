@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Keboola\Google\ClientBundle\Exception;
 
-class RestApiException extends \Exception
+use Exception;
+
+class RestApiException extends Exception
 {
 }
