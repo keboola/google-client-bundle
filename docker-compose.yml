@@ -9,6 +9,7 @@ services:
       - CLIENT_ID
       - CLIENT_SECRET
       - REFRESH_TOKEN
+      - SERVICE_ACCOUNT_JSON
 
   dev:
     build: .
@@ -21,3 +22,4 @@ services:
       - CLIENT_ID
       - CLIENT_SECRET
       - REFRESH_TOKEN
+      - SERVICE_ACCOUNT_JSON
