@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace Keboola\Google\ClientBundle\Google;
 
+use Google\Auth\CredentialsLoader;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\CurlHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
 use Keboola\Google\ClientBundle\Exception\RestApiException;
 use Keboola\Google\ClientBundle\Guzzle\RetryCallbackMiddleware;
-use Monolog\Logger;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Log\LoggerInterface;
+use Throwable;
 
 class RestApi
 {
@@ -21,6 +23,9 @@ class RestApi
     private const DEFAULT_CONNECT_TIMEOUT = 30;
     private const DEFAULT_REQUEST_TIMEOUT = 5 * 60;
 
+    public const AUTH_TYPE_OAUTH = 'oauth';
+    public const AUTH_TYPE_SERVICE_ACCOUNT = 'service_account';
+
     /** @var int */
     protected $maxBackoffs = 7;
 
@@ -28,10 +33,10 @@ class RestApi
     protected $backoffCallback403;
 
     /** @var string */
-    protected $accessToken;
+    protected $accessToken = '';
 
     /** @var string */
-    protected $refreshToken;
+    protected $refreshToken = '';
 
     /** @var string */
     protected $clientId;
@@ -45,24 +50,125 @@ class RestApi
     /** @var callable */
     protected $delayFn = null;
 
-    /** @var ?Logger */
+    /** @var ?LoggerInterface */
     protected $logger;
 
-    public function __construct(
-        string $clientId,
-        string $clientSecret,
-        string $accessToken = '',
-        string $refreshToken = '',
-        ?Logger $logger = null,
-    ) {
-        $this->clientId = $clientId;
-        $this->clientSecret = $clientSecret;
-        $this->setCredentials($accessToken, $refreshToken);
+    /** @var string */
+    protected $authType = self::AUTH_TYPE_OAUTH;
+
+    /** @var ?array */
+    protected $serviceAccountConfig;
+
+    /** @var ?array<string> */
+    protected $scopes;
+
+    /** @var mixed */
+    protected $serviceAccountCredentials;
+
+    /** @var ?string */
+    protected $serviceAccountAccessToken;
+
+    /** @var ?int */
+    protected $serviceAccountTokenExpiry;
+
+    public function __construct(?LoggerInterface $logger = null)
+    {
         $this->logger = $logger;
 
         $this->backoffCallback403 = function () {
             return true;
         };
+    }
+
+    /**
+     * Factory method for creating REST API client with OAuth authentication
+     */
+    public static function createWithOAuth(
+        string $clientId,
+        string $clientSecret,
+        string $accessToken = '',
+        string $refreshToken = '',
+        ?LoggerInterface $logger = null,
+    ): self {
+        $instance = new self($logger);
+        $instance->authType = self::AUTH_TYPE_OAUTH;
+        $instance->clientId = $clientId;
+        $instance->clientSecret = $clientSecret;
+        $instance->setCredentials($accessToken, $refreshToken);
+
+        $instance->backoffCallback403 = function () {
+            return true;
+        };
+
+        return $instance;
+    }
+
+    /**
+     * Factory method for creating REST API client with Service Account authentication
+     */
+    public static function createWithServiceAccount(
+        array $serviceAccountConfig,
+        array $scopes,
+        ?LoggerInterface $logger = null,
+    ): self {
+        $instance = new self($logger);
+        $instance->authType = self::AUTH_TYPE_SERVICE_ACCOUNT;
+        $instance->serviceAccountConfig = $serviceAccountConfig;
+        $instance->scopes = $scopes;
+        $instance->initializeServiceAccountCredentials();
+        return $instance;
+    }
+
+    /**
+     * Initialize Service Account credentials using Google Auth SDK
+     */
+    protected function initializeServiceAccountCredentials(): void
+    {
+        if ($this->serviceAccountConfig === null || empty($this->scopes)) {
+            throw new RestApiException('Service account configuration and scopes are required', 400);
+        }
+
+        try {
+            $this->serviceAccountCredentials = CredentialsLoader::makeCredentials(
+                $this->scopes,
+                $this->serviceAccountConfig,
+            );
+        } catch (Throwable $e) {
+            throw new RestApiException('Failed to initialize service account credentials: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get access token for Service Account
+     */
+    protected function getServiceAccountAccessToken(): string
+    {
+        // Return cached token if still valid
+        if ($this->serviceAccountAccessToken !== null &&
+            $this->serviceAccountTokenExpiry !== null &&
+            time() < $this->serviceAccountTokenExpiry - 60) { // 60s buffer
+            return $this->serviceAccountAccessToken;
+        }
+
+        if ($this->serviceAccountCredentials === null) {
+            throw new RestApiException('Service account credentials not initialized', 500);
+        }
+
+        try {
+            // Fetch new access token using Google Auth SDK
+            $authToken = $this->serviceAccountCredentials->fetchAuthToken();
+
+            if (!isset($authToken['access_token'])) {
+                throw new RestApiException('Failed to retrieve access token from service account', 500);
+            }
+
+            $this->serviceAccountAccessToken = $authToken['access_token'];
+            $this->serviceAccountTokenExpiry = time() + ($authToken['expires_in'] ?? 3600);
+
+            return $this->serviceAccountAccessToken;
+        } catch (Throwable $e) {
+            throw new RestApiException('Failed to fetch service account access token: ' . $e->getMessage(), 500);
+        }
     }
 
     public static function createRetryMiddleware(
@@ -100,8 +206,16 @@ class RestApi
             ?ResponseInterface $response = null,
         ) use ($api) {
             if ($response && $response->getStatusCode() === 401) {
-                $tokens = $api->refreshToken();
-                return $request->withHeader('Authorization', 'Bearer ' . $tokens['access_token']);
+                if ($api->authType === self::AUTH_TYPE_SERVICE_ACCOUNT) {
+                    // For Service Account, get new access token
+                    $api->serviceAccountAccessToken = null; // Clear cache
+                    $accessToken = $api->getServiceAccountAccessToken();
+                    return $request->withHeader('Authorization', 'Bearer ' . $accessToken);
+                } else {
+                    // For OAuth, use refresh token
+                    $tokens = $api->refreshToken();
+                    return $request->withHeader('Authorization', 'Bearer ' . $tokens['access_token']);
+                }
             }
             return $request;
         };
@@ -148,12 +262,25 @@ class RestApi
 
     public function getAccessToken(): string
     {
+        if ($this->authType === self::AUTH_TYPE_SERVICE_ACCOUNT) {
+            return $this->getServiceAccountAccessToken();
+        }
+
         return $this->accessToken;
     }
 
     public function getRefreshToken(): array
     {
+        if ($this->authType === self::AUTH_TYPE_SERVICE_ACCOUNT) {
+            throw new RestApiException('Refresh token is not applicable for service account authentication', 400);
+        }
+
         return $this->refreshToken();
+    }
+
+    public function getAuthType(): string
+    {
+        return $this->authType;
     }
 
     public function setRefreshTokenCallback(callable $callback): void
@@ -260,13 +387,21 @@ class RestApi
             throw new RestApiException('Wrong http method specified', 500);
         }
 
-        if ($this->refreshToken === null) {
-            throw new RestApiException('Refresh token must be set', 400);
+        // Validate authentication based on type
+        if ($this->authType === self::AUTH_TYPE_OAUTH && $this->refreshToken === null) {
+            throw new RestApiException('Refresh token must be set for OAuth authentication', 400);
+        } elseif ($this->authType === self::AUTH_TYPE_SERVICE_ACCOUNT &&
+            ($this->serviceAccountConfig === null || $this->scopes === null || empty($this->scopes))
+        ) {
+            throw new RestApiException(
+                'Service account configuration and scopes must be set for service account authentication',
+                400,
+            );
         }
 
         $headers = [
             'Accept' => 'application/json',
-            'Authorization' => 'Bearer ' . $this->accessToken,
+            'Authorization' => 'Bearer ' . $this->getAccessToken(),
         ];
 
         foreach ($addHeaders as $k => $v) {
@@ -306,11 +441,11 @@ class RestApi
                 ];
 
                 $this->logger->info(
-                    sprintf('Retrying request (%sx) - reason: %s', $retries, $response->getReasonPhrase()),
+                    sprintf('Retrying request (%dx) - reason: %s', $retries, $response->getReasonPhrase()),
                     $context,
                 );
             } else {
-                $this->logger->info(sprintf('Retrying request (%sx)', $retries), $context);
+                $this->logger->info(sprintf('Retrying request (%dx)', $retries), $context);
             }
         }
     }
